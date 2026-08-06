@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+# Mirror the main config's media type so the spec generated under test matches the
+# committed specs/openapi.yaml (the test resources otherwise shadow application.yaml).
+springdoc:
+  default-produces-media-type: application/json
+
+# Non-secret dummy key so the context boots (the filter requires a key). Full-context tests
+# that call a protected endpoint send this value in the X-Internal-Api-Key header.
+internal:
+  api-key: test-internal-key
+
+# Test resources fully shadow the main application.yaml, so the espn.* keys the beans read
+# at startup must be repeated here. The AES key is a non-secret base64 of 32 bytes.
+espn:
+  api-base-url: https://lm-api-reads.fantasy.espn.com
+  game-key: fhl
+  token-encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

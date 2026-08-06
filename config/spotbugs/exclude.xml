@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Noise in a Spring/record codebase, not actionable defects:
+         SPRING_ENDPOINT flags every @RequestMapping method; EI_EXPOSE_REP(2)
+         flags components storing injected beans and records holding lists. -->
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT,EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- SERVLET_HEADER: InternalApiKeyFilter reads the X-Internal-Api-Key request
+         header by design (the inter-service auth check), not a vulnerability. -->
+    <Match>
+        <Bug pattern="SERVLET_HEADER"/>
+    </Match>
+
+    <!-- REC_CATCH_EXCEPTION (STYLE): we deliberately catch broad Exception at
+         defensive boundaries — wrapping every crypto/decode failure into one
+         IllegalStateException (TokenCipher). -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+</FindBugsFilter>
