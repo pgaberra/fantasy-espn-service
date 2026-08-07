@@ -61,7 +61,18 @@ public class EspnLeagueService {
             Map.entry(29, "SOG"),
             Map.entry(31, "HIT"),
             Map.entry(32, "BLK"),
-            Map.entry(34, "GP"));
+            Map.entry(34, "GP"),
+            // ESPN scores a few stats the projection domain has no equivalent for. They are
+            // named here so they read as "HAT"/"OTL" rather than "STAT_28" when the BFF reports
+            // them as unsupported.
+            Map.entry(9, "OTL"),
+            Map.entry(28, "HAT"),
+            Map.entry(33, "DEF"),
+            Map.entry(35, "STPG"),
+            Map.entry(36, "STPA"),
+            Map.entry(37, "STP"),
+            Map.entry(38, "PPP"),
+            Map.entry(39, "SHP"));
 
     private final EspnFantasyClient client;
     private final EspnCredentialService credentialService;
