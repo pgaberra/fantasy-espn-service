@@ -12,7 +12,7 @@ class TokenCipherTest {
     private static final String KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
     private static TokenCipher cipher(String key) {
-        return new TokenCipher(new EspnProperties(null, "fhl", key));
+        return new TokenCipher(new EspnProperties(null, "fhl", 2026, key));
     }
 
     @Test

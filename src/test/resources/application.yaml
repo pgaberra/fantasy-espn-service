@@ -26,4 +26,5 @@ internal:
 espn:
   api-base-url: https://lm-api-reads.fantasy.espn.com
   game-key: fhl
+  season: 2026
   token-encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

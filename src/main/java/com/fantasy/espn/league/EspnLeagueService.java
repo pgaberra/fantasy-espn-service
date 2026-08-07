@@ -1,7 +1,9 @@
 package com.fantasy.espn.league;
 
+import com.fantasy.espn.config.EspnProperties;
 import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.credential.EspnCredentialService;
+import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
 import com.fantasy.espn.league.dto.LeagueTeam;
 import com.fantasy.espn.league.dto.LeagueTeamsResponse;
@@ -76,18 +78,37 @@ public class EspnLeagueService {
 
     private final EspnFantasyClient client;
     private final EspnCredentialService credentialService;
+    private final int configuredSeason;
 
-    public EspnLeagueService(EspnFantasyClient client, EspnCredentialService credentialService) {
+    public EspnLeagueService(EspnFantasyClient client, EspnCredentialService credentialService,
+                             EspnProperties props) {
         this.client = client;
         this.credentialService = credentialService;
+        this.configuredSeason = props.season();
     }
 
-    public LeagueSettingsResponse settings(String appUserId, int season, String leagueId) {
+    /**
+     * Reads a league for the configured season, falling back to the season before it when ESPN
+     * has no league there — a user who hasn't renewed for the coming season still syncs the
+     * settings they play by. An explicit season overrides both.
+     */
+    private JsonNode fetchLeague(Integer requestedSeason, String id, EspnCookies cookies, String view) {
+        if (requestedSeason != null) {
+            requireValidSeason(requestedSeason);
+            return client.getLeague(requestedSeason, id, cookies, view);
+        }
+        try {
+            return client.getLeague(configuredSeason, id, cookies, view);
+        } catch (EspnLeagueNotFoundException notFoundForCurrentSeason) {
+            return client.getLeague(configuredSeason - 1, id, cookies, view);
+        }
+    }
+
+    public LeagueSettingsResponse settings(String appUserId, Integer season, String leagueId) {
         String id = requireNumericLeagueId(leagueId);
-        requireValidSeason(season);
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
 
-        JsonNode root = client.getLeague(season, id, cookies, "mSettings");
+        JsonNode root = fetchLeague(season, id, cookies, "mSettings");
         JsonNode settings = root.path("settings");
         if (!settings.isObject()) {
             throw new IllegalStateException("ESPN returned no settings for the league");
@@ -102,13 +123,12 @@ public class EspnLeagueService {
                 parseRosterSlots(settings.path("rosterSettings").path("lineupSlotCounts")));
     }
 
-    public LeagueTeamsResponse teams(String appUserId, int season, String leagueId) {
+    public LeagueTeamsResponse teams(String appUserId, Integer season, String leagueId) {
         String id = requireNumericLeagueId(leagueId);
-        requireValidSeason(season);
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
         String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
 
-        JsonNode root = client.getLeague(season, id, cookies, "mTeam");
+        JsonNode root = fetchLeague(season, id, cookies, "mTeam");
         List<LeagueTeam> teams = new ArrayList<>();
         for (JsonNode team : root.path("teams")) {
             teams.add(new LeagueTeam(teamName(team), isMine(team, mySwid)));
