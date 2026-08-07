@@ -33,7 +33,7 @@ public class EspnLeagueController {
     @GetMapping("/{leagueId}/settings")
     public LeagueSettingsResponse settings(@PathVariable String leagueId,
                                            @RequestParam String appUserId,
-                                           @RequestParam int season) {
+                                           @RequestParam(required = false) Integer season) {
         return leagueService.settings(appUserId, season, leagueId);
     }
 
@@ -47,7 +47,7 @@ public class EspnLeagueController {
     @GetMapping("/{leagueId}/teams")
     public LeagueTeamsResponse teams(@PathVariable String leagueId,
                                      @RequestParam String appUserId,
-                                     @RequestParam int season) {
+                                     @RequestParam(required = false) Integer season) {
         return leagueService.teams(appUserId, season, leagueId);
     }
 }

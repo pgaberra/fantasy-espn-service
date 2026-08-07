@@ -40,6 +40,10 @@ espn:
   api-base-url: ${ESPN_API_BASE_URL:https://lm-api-reads.fantasy.espn.com}
   # Fantasy game code for NHL hockey.
   game-key: ${ESPN_GAME_KEY:fhl}
+  # Season leagues are read for, as ESPN's season id (start year: 2026 = the 2026-27 season).
+  # Keep in step with the season the app projects (the BFF's PROJECTION_SEASON and db-service's
+  # CURRENT_SEASON). A league missing for this season falls back to the one before it.
+  season: ${ESPN_SEASON:2026}
   # Base64 256-bit AES key for encrypting stored cookies (openssl rand -base64 32).
   token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
 
