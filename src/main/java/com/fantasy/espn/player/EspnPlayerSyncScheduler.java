@@ -1,6 +1,5 @@
 package com.fantasy.espn.player;
 
-import com.fantasy.espn.player.dto.PlayerSyncResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,8 +9,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Refreshes the cached ESPN stat lines daily, and once at startup when the cache is empty so
+ * Refreshes the cached ESPN stat lines nightly, and once at startup when the cache is empty so
  * a fresh deployment serves the stats without waiting for the next scheduled run.
+ *
+ * <p>A successful run is logged by the service itself; only failures are reported here, and a
+ * failure is never fatal — the previous stat lines stay in place until the next attempt.
  */
 @Component
 public class EspnPlayerSyncScheduler {
@@ -32,22 +34,22 @@ public class EspnPlayerSyncScheduler {
 
     @EventListener(ApplicationReadyEvent.class)
     public void syncOnStartupWhenEmpty() {
-        if (syncOnStartup && repository.count() == 0) {
-            runSync("startup");
+        if (!syncOnStartup || repository.count() > 0) {
+            return;
+        }
+        try {
+            playerStatsService.sync();
+        } catch (Exception e) {
+            log.error("ESPN player stat sync at startup failed", e);
         }
     }
 
     @Scheduled(cron = "${espn.player-sync-cron:0 45 7 * * *}", zone = "UTC")
     public void syncDaily() {
-        runSync("scheduled");
-    }
-
-    private void runSync(String trigger) {
         try {
-            PlayerSyncResponse result = playerStatsService.sync();
-            log.info("ESPN player stat sync ({}) stored {} stat lines", trigger, result.players());
+            playerStatsService.sync();
         } catch (Exception e) {
-            log.error("ESPN player stat sync ({}) failed", trigger, e);
+            log.error("Nightly ESPN player stat sync failed", e);
         }
     }
 }

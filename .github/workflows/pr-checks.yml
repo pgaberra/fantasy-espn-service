@@ -41,7 +41,7 @@ jobs:
           for report in build/reports/spotbugs/*.xml; do
             [ -f "$report" ] || continue
             echo "== $report"
-            grep -oE '<BugInstance type="[^"]+"[^>]*>|<SourceLine[^>]*sourcepath="[^"]+"[^>]*start="[0-9]+"' "$report" || true
+            grep -oE 'BugInstance type="[^"]+"|Class classname="[^"]+"|Method[^>]*name="[^"]+"|start="[0-9]+"' "$report" || true
           done
 
       - name: Publish coverage report
