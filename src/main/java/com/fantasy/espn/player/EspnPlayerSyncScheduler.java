@@ -8,9 +8,18 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+
 /**
- * Refreshes the cached ESPN stat lines nightly, and once at startup when the cache is empty so
- * a fresh deployment serves the stats without waiting for the next scheduled run.
+ * Refreshes the cached ESPN stat lines nightly, and once at startup when what's cached is
+ * missing or old.
+ *
+ * <p>Staleness is what's checked, not emptiness. A deployment that changes what the sync
+ * stores — a new column, a corrected parse — leaves a full but outdated cache behind, and an
+ * empty-only check would sit on it until the next nightly run with nothing to indicate the
+ * data didn't match the code. That happened twice while this service was being built.
  *
  * <p>A successful run is logged by the service itself; only failures are reported here, and a
  * failure is never fatal — the previous stat lines stay in place until the next attempt.
@@ -23,18 +32,21 @@ public class EspnPlayerSyncScheduler {
     private final EspnPlayerStatsService playerStatsService;
     private final EspnPlayerStatsRepository repository;
     private final boolean syncOnStartup;
+    private final Duration maxAge;
 
     public EspnPlayerSyncScheduler(EspnPlayerStatsService playerStatsService,
                                    EspnPlayerStatsRepository repository,
-                                   @Value("${espn.player-sync-on-startup:true}") boolean syncOnStartup) {
+                                   @Value("${espn.player-sync-on-startup:true}") boolean syncOnStartup,
+                                   @Value("${espn.player-stats-max-age:36h}") Duration maxAge) {
         this.playerStatsService = playerStatsService;
         this.repository = repository;
         this.syncOnStartup = syncOnStartup;
+        this.maxAge = maxAge;
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void syncOnStartupWhenEmpty() {
-        if (!syncOnStartup || repository.count() > 0) {
+    public void syncOnStartupWhenStale() {
+        if (!syncOnStartup || !isStale()) {
             return;
         }
         try {
@@ -51,5 +63,13 @@ public class EspnPlayerSyncScheduler {
         } catch (Exception e) {
             log.error("Nightly ESPN player stat sync failed", e);
         }
+    }
+
+    private boolean isStale() {
+        Optional<Instant> lastSyncedAt = repository.findLastSyncedAt();
+        if (lastSyncedAt.isEmpty()) {
+            return true;
+        }
+        return lastSyncedAt.get().isBefore(Instant.now().minus(maxAge));
     }
 }
