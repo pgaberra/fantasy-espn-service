@@ -121,8 +121,9 @@ public class EspnPlayerStatsService {
     }
 
     private static PlayerStatLine toStatLine(EspnPlayerStats entity) {
+        Long id = entity.getId();
         return new PlayerStatLine(
-                entity.getId(),
+                id == null ? 0L : id,
                 entity.getFullName(),
                 entity.getPosition(),
                 entity.getGamesPlayed(),
