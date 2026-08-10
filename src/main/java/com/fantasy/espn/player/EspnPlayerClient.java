@@ -40,6 +40,14 @@ public class EspnPlayerClient {
     private static final Map<Integer, String> POSITION_CODE =
             Map.of(1, "C", 2, "LW", 3, "RW", 4, "D", 5, "G");
 
+    /**
+     * Without this header ESPN serves one page of 50 players and gives no sign that the rest
+     * exist — no total, no next link, just a short array. The limit itself is not honoured (any
+     * value returns the whole universe); it is the presence of the filter that lifts the page.
+     */
+    private static final String PLAYER_FILTER_HEADER = "x-fantasy-filter";
+    private static final String ALL_PLAYERS_FILTER = "{\"players\":{\"limit\":5000}}";
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String gameKey;
@@ -57,6 +65,7 @@ public class EspnPlayerClient {
                             .queryParam("scoringPeriodId", 0)
                             .queryParam("view", "kona_player_info")
                             .build(gameKey, season))
+                    .header(PLAYER_FILTER_HEADER, ALL_PLAYERS_FILTER)
                     .exchange((request, response) -> {
                         int status = response.getStatusCode().value();
                         if (status < 200 || status >= 300) {

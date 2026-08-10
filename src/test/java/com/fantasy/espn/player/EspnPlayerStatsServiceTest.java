@@ -9,6 +9,8 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -38,38 +40,53 @@ class EspnPlayerStatsServiceTest {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
         service = new EspnPlayerStatsService(client, repository, transactionTemplate,
-                new EspnProperties("https://espn.test", "fhl", 2026, 2026, null));
+                new EspnProperties("https://espn.test", "fhl", 2027, 2026, null));
+    }
+
+    /** A season's worth of players, so the "this looks truncated" guard doesn't fire. */
+    private static List<PlayerStatLine> aSeasonOf(List<PlayerStatLine> lines, int fillerGamesPlayed) {
+        List<PlayerStatLine> all = new ArrayList<>(lines);
+        for (int i = 0; i < 250; i++) {
+            all.add(new PlayerStatLine(9000L + i, "Filler " + i, "C", fillerGamesPlayed, 0, 0, null, 0));
+        }
+        return all;
+    }
+
+    private static List<EspnPlayerStats> saved(EspnPlayerStatsRepository repository) {
+        ArgumentCaptor<List<EspnPlayerStats>> captor = ArgumentCaptor.captor();
+        verify(repository).saveAll(captor.capture());
+        return captor.getValue();
     }
 
     @Test
     void sync_storesFetchedStatLines() {
-        when(client.fetchSeasonStats(2026)).thenReturn(List.of(
-                new PlayerStatLine(1L, "Connor McDavid", "C", 67, 2, 1413, null, 88566)));
+        when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
+                new PlayerStatLine(1L, "Connor McDavid", "C", 67, 2, 1413, null, 88566)), 10));
 
         PlayerSyncResponse result = service.sync();
 
-        assertThat(result.players()).isEqualTo(1);
-        ArgumentCaptor<List<EspnPlayerStats>> saved = ArgumentCaptor.captor();
-        verify(repository).saveAll(saved.capture());
-        assertThat(saved.getValue()).singleElement()
+        assertThat(result.players()).isEqualTo(251);
+        assertThat(saved(repository))
+                .filteredOn(row -> row.getFullName().equals("Connor McDavid"))
+                .singleElement()
                 .satisfies(row -> {
-                    assertThat(row.getFullName()).isEqualTo("Connor McDavid");
                     assertThat(row.getHatTricks()).isEqualTo(2);
+                    assertThat(row.getShifts()).isEqualTo(1413);
                     assertThat(row.getSyncedAt()).isNotNull();
                 });
     }
 
     @Test
     void sync_keepsTheDuplicateThatActuallyPlayed() {
-        when(client.fetchSeasonStats(2026)).thenReturn(List.of(
+        when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
                 new PlayerStatLine(1L, "Matt Murray", "G", 0, null, null, 0, 0),
-                new PlayerStatLine(2L, "Matt Murray", "G", 5, null, null, 1, 18000)));
+                new PlayerStatLine(2L, "Matt Murray", "G", 5, null, null, 1, 18000)), 10));
 
         service.sync();
 
-        ArgumentCaptor<List<EspnPlayerStats>> saved = ArgumentCaptor.captor();
-        verify(repository).saveAll(saved.capture());
-        assertThat(saved.getValue()).singleElement()
+        assertThat(saved(repository))
+                .filteredOn(row -> row.getFullName().equals("Matt Murray"))
+                .singleElement()
                 .satisfies(row -> assertThat(row.getId()).isEqualTo(2L));
     }
 
@@ -84,12 +101,29 @@ class EspnPlayerStatsServiceTest {
     }
 
     @Test
+    void sync_preservesExistingDataWhenOnlyOnePageCameBack() {
+        // ESPN pages the player endpoint at 50 and says nothing about the rest, so a dropped
+        // request header arrives as a short but otherwise valid-looking list.
+        List<PlayerStatLine> onePage = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            onePage.add(new PlayerStatLine(i, "Player " + i, "C", 60, 1, 1200, null, 70000));
+        }
+        when(client.fetchSeasonStats(2026)).thenReturn(onePage);
+
+        assertThatThrownBy(() -> service.sync())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("far fewer than a season holds");
+
+        verify(repository, never()).deleteAllInBatch();
+        verify(repository, never()).saveAll(any());
+    }
+
+    @Test
     void sync_preservesExistingDataWhenTheSeasonHasNotBeenPlayedYet() {
         // ESPN answers for an upcoming season with a full set of all-zero rows, not with
         // nothing, so an off-by-one season would replace real stats with zeroes.
-        when(client.fetchSeasonStats(2026)).thenReturn(List.of(
-                new PlayerStatLine(1L, "Connor McDavid", "C", 0, 0, 0, null, 0),
-                new PlayerStatLine(2L, "Cale Makar", "D", 0, 0, 0, null, 0)));
+        when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
+                new PlayerStatLine(1L, "Connor McDavid", "C", 0, 0, 0, null, 0)), 0));
 
         assertThatThrownBy(() -> service.sync())
                 .isInstanceOf(IllegalStateException.class)
@@ -106,12 +140,12 @@ class EspnPlayerStatsServiceTest {
         row.setFullName("Cale Makar");
         row.setPosition("D");
         row.setShifts(2137);
-        row.setSyncedAt(java.time.Instant.parse("2026-08-10T07:45:00Z"));
+        row.setSyncedAt(Instant.parse("2026-08-10T07:45:00Z"));
         when(repository.findAll()).thenReturn(List.of(row));
 
         var response = service.players();
 
-        assertThat(response.syncedAt()).isEqualTo(java.time.Instant.parse("2026-08-10T07:45:00Z"));
+        assertThat(response.syncedAt()).isEqualTo(Instant.parse("2026-08-10T07:45:00Z"));
         assertThat(response.players()).singleElement()
                 .satisfies(line -> assertThat(line.shifts()).isEqualTo(2137));
     }

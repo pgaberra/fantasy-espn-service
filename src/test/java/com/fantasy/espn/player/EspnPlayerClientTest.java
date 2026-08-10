@@ -14,6 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -58,7 +59,22 @@ class EspnPlayerClientTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://espn.test");
         server = MockRestServiceServer.bindTo(builder).build();
         client = new EspnPlayerClient(builder.build(),
-                new EspnProperties("https://espn.test", "fhl", 2026, 2026, null));
+                new EspnProperties("https://espn.test", "fhl", 2027, 2026, null));
+    }
+
+    /**
+     * Without the filter header ESPN serves one page of 50 players and gives no sign that the
+     * rest exist, so the cache silently ends up holding a fraction of the league.
+     */
+    @Test
+    void fetchSeasonStats_asksForEveryPlayerRatherThanTheFirstPage() {
+        server.expect(requestTo(containsString("/players")))
+                .andExpect(header("x-fantasy-filter", containsString("\"limit\"")))
+                .andRespond(withSuccess(PLAYERS_JSON, MediaType.APPLICATION_JSON));
+
+        client.fetchSeasonStats(2026);
+
+        server.verify();
     }
 
     @Test
