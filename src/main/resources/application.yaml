@@ -41,14 +41,16 @@ espn:
   # Fantasy game code for NHL hockey.
   game-key: ${ESPN_GAME_KEY:fhl}
   # Season leagues are read for, as ESPN's season id. ESPN keys a season by the year it ends
-  # in: 2026 is the 2025-26 season. Bump this once ESPN opens the next league year. A league
-  # missing for this season falls back to the one before it.
-  season: ${ESPN_SEASON:2026}
-  # Season the cached player stat lines are read for. Defaults to the league season because
-  # they are normally the same — the last completed season is both what leagues are still on
-  # and what projections are seeded from. Set it explicitly once the league season moves on to
-  # a year that has not been played yet.
-  player-stats-season: ${ESPN_PLAYER_STATS_SEASON:${ESPN_SEASON:2026}}
+  # in: 2027 is the 2026-27 season, which ESPN opened for league setup in the summer of 2026.
+  # A league missing for this season falls back to the one before it, so a manager who hasn't
+  # renewed yet still syncs.
+  season: ${ESPN_SEASON:2027}
+  # Season the cached player stat lines are read for, which is NOT the league season: leagues
+  # open months before a puck is dropped, and projections are seeded from the last season that
+  # was actually played. ESPN does publish season-total rows for the upcoming season — they are
+  # simply all zeroes — so pointing this at the league season would replace every stat line
+  # with nothing rather than fail loudly. Bump it once the current season has been played.
+  player-stats-season: ${ESPN_PLAYER_STATS_SEASON:2026}
   # When the cached stat lines are refreshed (UTC). ESPN's season totals change at most once a
   # day out of season, so a single nightly run is plenty.
   player-sync-cron: ${ESPN_PLAYER_SYNC_CRON:0 45 7 * * *}

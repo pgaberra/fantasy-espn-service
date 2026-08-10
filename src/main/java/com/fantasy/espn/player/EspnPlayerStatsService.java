@@ -70,6 +70,14 @@ public class EspnPlayerStatsService {
             // Never wipe the cache on an empty fetch — ESPN is the only source for these stats.
             throw new IllegalStateException("ESPN returned no player stat lines; preserving existing data");
         }
+        if (fetched.stream().noneMatch(line -> gamesPlayed(line) > 0)) {
+            // ESPN answers for a season that hasn't been played yet with a full set of all-zero
+            // rows rather than nothing, so an off-by-one season would quietly replace every
+            // stat line with zeroes. Refuse, and keep what we have.
+            throw new IllegalStateException(
+                    "ESPN reported no games played for season " + season
+                            + "; it has probably not been played yet. Preserving existing data");
+        }
         List<PlayerStatLine> deduped = dedupe(fetched);
 
         Instant now = Instant.now();

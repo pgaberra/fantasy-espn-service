@@ -26,7 +26,7 @@ internal:
 espn:
   api-base-url: https://lm-api-reads.fantasy.espn.com
   game-key: fhl
-  season: 2026
+  season: 2027
   player-stats-season: 2026
   # Never reach out to ESPN from a test run: the empty-cache startup sync stays off, and the
   # nightly cron is pushed to a time no test will ever reach.

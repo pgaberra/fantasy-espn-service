@@ -84,6 +84,22 @@ class EspnPlayerStatsServiceTest {
     }
 
     @Test
+    void sync_preservesExistingDataWhenTheSeasonHasNotBeenPlayedYet() {
+        // ESPN answers for an upcoming season with a full set of all-zero rows, not with
+        // nothing, so an off-by-one season would replace real stats with zeroes.
+        when(client.fetchSeasonStats(2026)).thenReturn(List.of(
+                new PlayerStatLine(1L, "Connor McDavid", "C", 0, 0, 0, null, 0),
+                new PlayerStatLine(2L, "Cale Makar", "D", 0, 0, 0, null, 0)));
+
+        assertThatThrownBy(() -> service.sync())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no games played");
+
+        verify(repository, never()).deleteAllInBatch();
+        verify(repository, never()).saveAll(any());
+    }
+
+    @Test
     void players_reportsTheLatestSyncTime() {
         EspnPlayerStats row = new EspnPlayerStats();
         row.setId(1L);

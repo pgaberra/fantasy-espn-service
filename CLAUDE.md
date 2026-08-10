@@ -92,7 +92,11 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   - goalies: `0 GS · 1 W · 2 L · 3 SA · 4 GA · 6 SV · 7 SO · 8 TOI (s) · 9 OTL · 10 GAA ·
     11 SV% · 12 win %`
   - `30 GP` is the universal games-played (skaters *and* goalies); `34` is skater-only.
-- **A season is keyed by the year it ends in:** `seasons/2026` is the 2025-26 season.
+- **A season is keyed by the year it ends in:** `seasons/2027` is the 2026-27 season. ESPN
+  opens a league year months before it is played, so `espn.season` (leagues) and
+  `espn.player-stats-season` (the last season actually played) are **not** the same value for
+  most of the year. ESPN reports all-zero season totals for a season that hasn't started, so
+  pointing the stat sync at the league year empties the cache instead of failing.
 - **scoringType** lives at `settings.scoringSettings.scoringType`; the BFF collapses it to
   points vs category. League size = `settings.size`.
 - ESPN's v3 API is **unofficial** and can change shape without notice — keep all shape

@@ -18,13 +18,14 @@ public record EspnProperties(
         // Fantasy game code (fhl = NHL hockey).
         String gameKey,
         // The season leagues are read for, as ESPN's season id. ESPN keys a season by the year
-        // it ends in: 2026 is the 2025-26 season. Users never pick one. When a league isn't
+        // it ends in: 2027 is the 2026-27 season. Users never pick one. When a league isn't
         // found for it — e.g. the user hasn't renewed yet — the reader falls back to the season
         // before it.
         Integer season,
-        // The season the cached player stat lines are read for — the last completed season,
-        // which is the one projections are seeded from. Separate from `season` above because
-        // that one tracks the league year, which moves on before the new season has any stats.
+        // The season the cached player stat lines are read for: the last season actually
+        // played, which is the one projections are seeded from. It trails {@code season} for
+        // most of the year, because ESPN opens a league year months before it is played and
+        // reports all-zero season totals for it in the meantime.
         Integer playerStatsSeason,
         // Base64-encoded 256-bit AES key used to encrypt stored espn_s2 / SWID cookies.
         String tokenEncryptionKey
