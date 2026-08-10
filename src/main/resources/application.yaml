@@ -54,9 +54,14 @@ espn:
   # When the cached stat lines are refreshed (UTC). ESPN's season totals change at most once a
   # day out of season, so a single nightly run is plenty.
   player-sync-cron: ${ESPN_PLAYER_SYNC_CRON:0 45 7 * * *}
-  # Fill an empty cache once at startup so a fresh deployment serves the stats immediately
-  # instead of waiting for the first nightly run.
+  # Refresh the cache once at startup when it is missing or older than player-stats-max-age,
+  # so a fresh deployment serves the stats immediately instead of waiting for the first nightly
+  # run — and so a deployment that changes what the sync stores doesn't sit on data written by
+  # the previous version.
   player-sync-on-startup: ${ESPN_PLAYER_SYNC_ON_STARTUP:true}
+  # How old the cache may be before a startup counts it as stale. Comfortably longer than the
+  # nightly interval, so an ordinary restart doesn't re-fetch 33 MB for no reason.
+  player-stats-max-age: ${ESPN_PLAYER_STATS_MAX_AGE:36h}
   # Base64 256-bit AES key for encrypting stored cookies (openssl rand -base64 32).
   token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
 

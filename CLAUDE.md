@@ -75,7 +75,11 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     — keyed by name, position **and jersey**, because two different people do share a name and a
     position (two Matt Murrays in goal, two Connor Murphys on defence) and collapsing them would
     throw away a real season. The jersey is carried through for the BFF to break that same tie.
-  - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is empty.
+  - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is **missing or
+    stale** (`espn.player-stats-max-age`, 36h). Staleness rather than emptiness: a deployment
+    that changes what the sync stores leaves a full but outdated cache, and an empty-only check
+    would sit on it until the next nightly run with nothing to show the data didn't match the
+    code. That happened twice while this service was being built.
   - `EspnPlayerController` — `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
