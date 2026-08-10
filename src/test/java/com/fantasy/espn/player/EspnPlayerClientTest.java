@@ -28,7 +28,7 @@ class EspnPlayerClientTest {
     private static final String PLAYERS_JSON = """
             [
               {
-                "id": 3895074, "fullName": "Connor McDavid", "defaultPositionId": 1,
+                "id": 3895074, "fullName": "Connor McDavid", "defaultPositionId": 1, "jersey": "97",
                 "stats": [
                   {"statSourceId": 0, "statSplitTypeId": 5, "scoringPeriodId": 12, "seasonId": 2026,
                    "stats": {"13": 1.0, "25": 22.0}},
@@ -88,6 +88,7 @@ class EspnPlayerClientTest {
         PlayerStatLine skater = lines.getFirst();
         assertThat(skater.fullName()).isEqualTo("Connor McDavid");
         assertThat(skater.position()).isEqualTo("C");
+        assertThat(skater.sweaterNumber()).isEqualTo(97);
         assertThat(skater.gamesPlayed()).isEqualTo(67);
         assertThat(skater.hatTricks()).isEqualTo(2);
         assertThat(skater.shifts()).isEqualTo(1413);
@@ -96,6 +97,8 @@ class EspnPlayerClientTest {
 
         PlayerStatLine goalie = lines.get(1);
         assertThat(goalie.position()).isEqualTo("G");
+        // ESPN omits the jersey for some players; it must not fail the parse.
+        assertThat(goalie.sweaterNumber()).isNull();
         assertThat(goalie.overtimeLosses()).isEqualTo(3);
         assertThat(goalie.timeOnIce()).isEqualTo(224482);
         assertThat(goalie.shifts()).isNull();

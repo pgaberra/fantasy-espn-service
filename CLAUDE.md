@@ -71,7 +71,10 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     per game per player), so it is **stream-parsed** one player at a time.
   - `EspnPlayerStats` / `EspnPlayerStatsRepository` — JPA entity (`espn_player_stats`).
   - `EspnPlayerStatsService` — sync (replace-all in one transaction; never wipes on an empty
-    fetch) + read. Drops ESPN's occasional duplicate player records, keeping the one that played.
+    fetch) + read. Drops ESPN's occasional duplicate player records, keeping the one that played
+    — keyed by name, position **and jersey**, because two different people do share a name and a
+    position (two Matt Murrays in goal, two Connor Murphys on defence) and collapsing them would
+    throw away a real season. The jersey is carried through for the BFF to break that same tie.
   - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is empty.
   - `EspnPlayerController` — `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`

@@ -12,6 +12,8 @@ public record PlayerStatLine(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String fullName,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "C, LW, RW, D or G")
         String position,
+        @Schema(description = "Jersey number, which is what separates two players who share a name")
+        Integer sweaterNumber,
         Integer gamesPlayed,
         Integer hatTricks,
         Integer shifts,
