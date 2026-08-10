@@ -29,6 +29,9 @@ public class EspnPlayerStatsService {
 
     private static final Logger log = LoggerFactory.getLogger(EspnPlayerStatsService.class);
 
+    /** Roughly a thousand players record a stat line in a season; 50 is ESPN's page size. */
+    private static final int MINIMUM_CREDIBLE_PLAYERS = 200;
+
     private final EspnPlayerClient client;
     private final EspnPlayerStatsRepository repository;
     private final TransactionTemplate transactionTemplate;
@@ -69,6 +72,14 @@ public class EspnPlayerStatsService {
         if (fetched.isEmpty()) {
             // Never wipe the cache on an empty fetch — ESPN is the only source for these stats.
             throw new IllegalStateException("ESPN returned no player stat lines; preserving existing data");
+        }
+        if (fetched.size() < MINIMUM_CREDIBLE_PLAYERS) {
+            // ESPN pages the player endpoint at 50 and says nothing about the rest, so a
+            // dropped request header shows up as a plausible-looking short list rather than as
+            // an error. A real season has roughly a thousand players with a stat line.
+            throw new IllegalStateException(
+                    "ESPN returned only " + fetched.size() + " player stat lines, far fewer than a "
+                            + "season holds; preserving existing data");
         }
         if (fetched.stream().noneMatch(line -> gamesPlayed(line) > 0)) {
             // ESPN answers for a season that hasn't been played yet with a full set of all-zero
