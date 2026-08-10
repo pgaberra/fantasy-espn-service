@@ -64,7 +64,7 @@ class EspnLeagueServiceTest {
     private static final int CONFIGURED_SEASON = 2026;
 
     private final EspnProperties props =
-            new EspnProperties("https://espn.test", "fhl", CONFIGURED_SEASON, null);
+            new EspnProperties("https://espn.test", "fhl", CONFIGURED_SEASON, CONFIGURED_SEASON, null);
 
     private MockRestServiceServer server;
     private EspnCredentialService credentialService;
