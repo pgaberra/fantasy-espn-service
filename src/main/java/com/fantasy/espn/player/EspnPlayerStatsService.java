@@ -106,13 +106,18 @@ public class EspnPlayerStatsService {
 
     /**
      * ESPN's player universe carries occasional duplicate records for the same person (same
-     * name and position, different ids). Keep the one that actually played — a stale duplicate
-     * would otherwise make the BFF's name match ambiguous and drop the player's stats.
+     * name, position and jersey, different ids). Keep the one that actually played — a stale
+     * duplicate would otherwise make the BFF's name match ambiguous and drop the player's stats.
+     *
+     * <p>The jersey is part of the key because two different people do share a name and a
+     * position: the NHL has had two Matt Murrays in goal and two Connor Murphys on defence.
+     * Collapsing those would throw away a real season.
      */
     private static List<PlayerStatLine> dedupe(List<PlayerStatLine> lines) {
         Map<String, PlayerStatLine> best = new LinkedHashMap<>();
         for (PlayerStatLine line : lines) {
-            String key = line.fullName().toLowerCase(Locale.ROOT) + "|" + line.position();
+            String key = line.fullName().toLowerCase(Locale.ROOT) + "|" + line.position()
+                    + "|" + line.sweaterNumber();
             PlayerStatLine existing = best.get(key);
             if (existing == null || gamesPlayed(line) > gamesPlayed(existing)) {
                 best.put(key, line);
@@ -130,6 +135,7 @@ public class EspnPlayerStatsService {
         entity.setId(line.id());
         entity.setFullName(line.fullName());
         entity.setPosition(line.position());
+        entity.setSweaterNumber(line.sweaterNumber());
         entity.setGamesPlayed(line.gamesPlayed());
         entity.setHatTricks(line.hatTricks());
         entity.setShifts(line.shifts());
@@ -145,6 +151,7 @@ public class EspnPlayerStatsService {
                 id == null ? 0L : id,
                 entity.getFullName(),
                 entity.getPosition(),
+                entity.getSweaterNumber(),
                 entity.getGamesPlayed(),
                 entity.getHatTricks(),
                 entity.getShifts(),

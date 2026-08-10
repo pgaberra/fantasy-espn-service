@@ -26,6 +26,9 @@ public class EspnPlayerStats {
     @Column(name = "position", nullable = false, length = 4)
     private String position;
 
+    @Column(name = "sweater_number")
+    private Integer sweaterNumber;
+
     @Column(name = "games_played")
     private Integer gamesPlayed;
 
@@ -69,6 +72,14 @@ public class EspnPlayerStats {
 
     public void setPosition(String position) {
         this.position = position;
+    }
+
+    public Integer getSweaterNumber() {
+        return sweaterNumber;
+    }
+
+    public void setSweaterNumber(Integer sweaterNumber) {
+        this.sweaterNumber = sweaterNumber;
     }
 
     public Integer getGamesPlayed() {

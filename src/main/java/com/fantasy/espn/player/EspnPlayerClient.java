@@ -109,6 +109,7 @@ public class EspnPlayerClient {
                 player.path("id").asLong(),
                 fullName,
                 position,
+                jerseyNumber(player),
                 intStat(seasonTotals, GAMES_PLAYED),
                 intStat(seasonTotals, HAT_TRICKS),
                 goalie ? null : intStat(seasonTotals, SHIFTS),
@@ -132,6 +133,19 @@ public class EspnPlayerClient {
             }
         }
         return null;
+    }
+
+    /** ESPN sends the jersey as a string, and leaves it off for players without one. */
+    private static Integer jerseyNumber(JsonNode player) {
+        String jersey = player.path("jersey").asText(null);
+        if (jersey == null || jersey.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(jersey.trim());
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
     }
 
     private static Integer intStat(JsonNode stats, int statId) {

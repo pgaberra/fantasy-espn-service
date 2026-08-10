@@ -47,7 +47,7 @@ class EspnPlayerStatsServiceTest {
     private static List<PlayerStatLine> aSeasonOf(List<PlayerStatLine> lines, int fillerGamesPlayed) {
         List<PlayerStatLine> all = new ArrayList<>(lines);
         for (int i = 0; i < 250; i++) {
-            all.add(new PlayerStatLine(9000L + i, "Filler " + i, "C", fillerGamesPlayed, 0, 0, null, 0));
+            all.add(new PlayerStatLine(9000L + i, "Filler " + i, "C", i, fillerGamesPlayed, 0, 0, null, 0));
         }
         return all;
     }
@@ -61,7 +61,7 @@ class EspnPlayerStatsServiceTest {
     @Test
     void sync_storesFetchedStatLines() {
         when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
-                new PlayerStatLine(1L, "Connor McDavid", "C", 67, 2, 1413, null, 88566)), 10));
+                new PlayerStatLine(1L, "Connor McDavid", "C", null, 67, 2, 1413, null, 88566)), 10));
 
         PlayerSyncResponse result = service.sync();
 
@@ -78,9 +78,10 @@ class EspnPlayerStatsServiceTest {
 
     @Test
     void sync_keepsTheDuplicateThatActuallyPlayed() {
+        // Same person, listed twice by ESPN: same name, position and jersey, different ids.
         when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
-                new PlayerStatLine(1L, "Matt Murray", "G", 0, null, null, 0, 0),
-                new PlayerStatLine(2L, "Matt Murray", "G", 5, null, null, 1, 18000)), 10));
+                new PlayerStatLine(1L, "Matt Murray", "G", 30, 0, null, null, 0, 0),
+                new PlayerStatLine(2L, "Matt Murray", "G", 30, 5, null, null, 1, 18000)), 10));
 
         service.sync();
 
@@ -88,6 +89,23 @@ class EspnPlayerStatsServiceTest {
                 .filteredOn(row -> row.getFullName().equals("Matt Murray"))
                 .singleElement()
                 .satisfies(row -> assertThat(row.getId()).isEqualTo(2L));
+    }
+
+    @Test
+    void sync_keepsTwoPlayersWhoShareANameAndPosition() {
+        // Two different people: the NHL has had two Matt Murrays in goal at once. Collapsing
+        // them would throw away a real season and leave the BFF unable to tell them apart.
+        when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
+                new PlayerStatLine(1L, "Matt Murray", "G", 30, 5, null, null, 1, 18000),
+                new PlayerStatLine(2L, "Matt Murray", "G", 32, 0, null, null, 0, 0)), 10));
+
+        service.sync();
+
+        assertThat(saved(repository))
+                .filteredOn(row -> row.getFullName().equals("Matt Murray"))
+                .hasSize(2)
+                .extracting(EspnPlayerStats::getSweaterNumber)
+                .containsExactlyInAnyOrder(30, 32);
     }
 
     @Test
@@ -106,7 +124,7 @@ class EspnPlayerStatsServiceTest {
         // request header arrives as a short but otherwise valid-looking list.
         List<PlayerStatLine> onePage = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
-            onePage.add(new PlayerStatLine(i, "Player " + i, "C", 60, 1, 1200, null, 70000));
+            onePage.add(new PlayerStatLine(i, "Player " + i, "C", i, 60, 1, 1200, null, 70000));
         }
         when(client.fetchSeasonStats(2026)).thenReturn(onePage);
 
@@ -123,7 +141,7 @@ class EspnPlayerStatsServiceTest {
         // ESPN answers for an upcoming season with a full set of all-zero rows, not with
         // nothing, so an off-by-one season would replace real stats with zeroes.
         when(client.fetchSeasonStats(2026)).thenReturn(aSeasonOf(List.of(
-                new PlayerStatLine(1L, "Connor McDavid", "C", 0, 0, 0, null, 0)), 0));
+                new PlayerStatLine(1L, "Connor McDavid", "C", null, 0, 0, 0, null, 0)), 0));
 
         assertThatThrownBy(() -> service.sync())
                 .isInstanceOf(IllegalStateException.class)
