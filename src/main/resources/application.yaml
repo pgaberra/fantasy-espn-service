@@ -40,10 +40,21 @@ espn:
   api-base-url: ${ESPN_API_BASE_URL:https://lm-api-reads.fantasy.espn.com}
   # Fantasy game code for NHL hockey.
   game-key: ${ESPN_GAME_KEY:fhl}
-  # Season leagues are read for, as ESPN's season id (start year: 2026 = the 2026-27 season).
-  # Keep in step with the season the app projects (the BFF's PROJECTION_SEASON and db-service's
-  # CURRENT_SEASON). A league missing for this season falls back to the one before it.
+  # Season leagues are read for, as ESPN's season id. ESPN keys a season by the year it ends
+  # in: 2026 is the 2025-26 season. Bump this once ESPN opens the next league year. A league
+  # missing for this season falls back to the one before it.
   season: ${ESPN_SEASON:2026}
+  # Season the cached player stat lines are read for. Defaults to the league season because
+  # they are normally the same — the last completed season is both what leagues are still on
+  # and what projections are seeded from. Set it explicitly once the league season moves on to
+  # a year that has not been played yet.
+  player-stats-season: ${ESPN_PLAYER_STATS_SEASON:${ESPN_SEASON:2026}}
+  # When the cached stat lines are refreshed (UTC). ESPN's season totals change at most once a
+  # day out of season, so a single nightly run is plenty.
+  player-sync-cron: ${ESPN_PLAYER_SYNC_CRON:0 45 7 * * *}
+  # Fill an empty cache once at startup so a fresh deployment serves the stats immediately
+  # instead of waiting for the first nightly run.
+  player-sync-on-startup: ${ESPN_PLAYER_SYNC_ON_STARTUP:true}
   # Base64 256-bit AES key for encrypting stored cookies (openssl rand -base64 32).
   token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
 

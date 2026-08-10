@@ -27,7 +27,7 @@ class EspnFantasyClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://espn.test");
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new EspnFantasyClient(builder.build(), new EspnProperties("https://espn.test", "fhl", 2026, null));
+        client = new EspnFantasyClient(builder.build(), new EspnProperties("https://espn.test", "fhl", 2026, 2026, null));
     }
 
     @Test

@@ -64,6 +64,16 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams}`.
   - `dto/` — `LeagueSettingsResponse` (+ `StatCategory`, `RosterSlot`), `LeagueTeamsResponse`
     (+ `LeagueTeam`).
+- `player/` — cached season stat lines for the stats **Yahoo does not report**:
+  - `EspnPlayerClient` — reads ESPN's *public* player endpoint
+    (`/apis/v3/games/fhl/seasons/{season}/players?view=kona_player_info`). No league id and no
+    cookies, which is what makes it usable for every user. The response is tens of MB (a split
+    per game per player), so it is **stream-parsed** one player at a time.
+  - `EspnPlayerStats` / `EspnPlayerStatsRepository` — JPA entity (`espn_player_stats`).
+  - `EspnPlayerStatsService` — sync (replace-all in one transaction; never wipes on an empty
+    fetch) + read. Drops ESPN's occasional duplicate player records, keeping the one that played.
+  - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is empty.
+  - `EspnPlayerController` — `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
   `InternalApiKeyFilter` (API-key auth; exempts only the actuator health/info probes).
@@ -73,9 +83,16 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 ## ESPN → projection mapping (hockey = `fhl`)
 
 - **Lineup-slot ids → position:** `0 C · 1 LW · 2 RW · 3 F · 4 D · 5 G · 6 Util · 7 BN · 8 IR`.
-- **Stat ids → abbrev:** skaters `13 G · 14 A · 15 +/- · 17 PIM · 18 PPG · 19 PPA · 20 SHG ·
-  21 SHA · 22 GWG · 23 FOW · 24 FOL · 29 SOG · 31 HIT · 32 BLK · 34 GP`; goalies `0 GS · 1 W ·
-  2 L · 3 SA · 4 GA · 6 SV · 7 SO · 10 GAA · 11 SV%`.
+- **defaultPositionId → position:** `1 C · 2 LW · 3 RW · 4 D · 5 G`.
+- **Stat ids** (verified against real season lines, not guessed — ESPN publishes no glossary):
+  - skaters: `13 G · 14 A · 15 +/- · 16 P · 17 PIM · 18 PPG · 19 PPA · 20 SHG · 21 SHA ·
+    22 GWG · 23 FOW · 24 FOL · 25 shifts · 26 TOI (s) · 27 ATOI (s) · 28 hat tricks ·
+    29 SOG · 31 HIT · 32 BLK · 33 defenseman points · 34 GP · 35/36/37 special-teams G/A/P ·
+    38 PPP · 39 SHP`
+  - goalies: `0 GS · 1 W · 2 L · 3 SA · 4 GA · 6 SV · 7 SO · 8 TOI (s) · 9 OTL · 10 GAA ·
+    11 SV% · 12 win %`
+  - `30 GP` is the universal games-played (skaters *and* goalies); `34` is skater-only.
+- **A season is keyed by the year it ends in:** `seasons/2026` is the 2025-26 season.
 - **scoringType** lives at `settings.scoringSettings.scoringType`; the BFF collapses it to
   points vs category. League size = `settings.size`.
 - ESPN's v3 API is **unofficial** and can change shape without notice — keep all shape
