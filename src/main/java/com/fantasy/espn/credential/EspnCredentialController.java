@@ -1,6 +1,7 @@
 package com.fantasy.espn.credential;
 
 import com.fantasy.espn.credential.dto.CredentialStatusResponse;
+import com.fantasy.espn.credential.dto.CredentialValuesResponse;
 import com.fantasy.espn.credential.dto.SaveCredentialsRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.NoSuchElementException;
 
 @Tag(name = "ESPN Credentials",
         description = "A user's stored ESPN cookies (espn_s2 + SWID), needed to read private leagues")
@@ -45,6 +48,19 @@ public class EspnCredentialController {
     @GetMapping
     public CredentialStatusResponse status(@RequestParam String appUserId) {
         return new CredentialStatusResponse(credentialService.hasCredentials(appUserId));
+    }
+
+    @Operation(summary = "The user's stored ESPN cookies themselves",
+            description = "For showing a user their own saved connection. 404 when none are stored.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cookies returned"),
+            @ApiResponse(responseCode = "404", description = "User has no stored cookies")
+    })
+    @GetMapping("/values")
+    public CredentialValuesResponse values(@RequestParam String appUserId) {
+        EspnCookies cookies = credentialService.find(appUserId)
+                .orElseThrow(() -> new NoSuchElementException("No stored ESPN cookies"));
+        return new CredentialValuesResponse(cookies.espnS2(), cookies.swid());
     }
 
     @Operation(summary = "Delete the user's stored ESPN cookies")
