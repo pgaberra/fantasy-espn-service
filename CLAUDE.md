@@ -127,14 +127,11 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 - Cookies are **always encrypted at rest** — never store or log a raw cookie; never return
   them (only `hasCredentials`). The encryption key comes only from env.
 
-### Logging & error handling
+### Error handling
 
-**Never silence an error.** The `@RestControllerAdvice` logs the full stack trace
-(`log.error`) for genuine faults and returns a consistent `ErrorDto`:
-
-- **5xx / genuine faults** (unexpected exceptions, ESPN upstream failing): log at `ERROR`.
-- **4xx / expected client outcomes** (private league / missing cookies → 400, no such league
-  → 404, malformed id/season → 400): do **not** log as errors.
+The monorepo-wide rule (never silence an error; `ERROR` for 5xx, quiet for 4xx) lives in
+the root `CLAUDE.md`. The expected 4xx here are: private league / missing cookies → 400,
+no such league → 404, malformed id or season → 400.
 
 ### OpenAPI annotations & spec snapshot (`specs/openapi.yaml`)
 
@@ -156,10 +153,13 @@ git add specs/openapi.yaml
 
 ## Monorepo conventions
 
-The web talks only to the BFF; inter-service calls use a shared `X-Internal-Api-Key` header.
-Branch → push → PR → checks pass → **squash merge** to `master` (the PR title becomes the
-commit message; make it a proper `feat:`/`fix:` message and merge with an explicit subject).
-No attribution trailers. Secrets only from env, never committed.
+The full set lives in the monorepo root `CLAUDE.md`: input validation at every boundary,
+logging & error handling, secrets only from env, one worktree per agent, and the merge
+procedure. In short — the web talks only to the BFF; inter-service calls carry a shared
+`X-Internal-Api-Key` header. Branch → push → PR → checks pass → **squash merge** to `master`
+(the PR title becomes the commit message; make it a proper `feat:`/`fix:` message and merge
+with an explicit `--subject`). No attribution trailers. Secrets only from env, never
+committed. Never merge a PR titled "wip"/"draft".
 
 ## Deployment
 
