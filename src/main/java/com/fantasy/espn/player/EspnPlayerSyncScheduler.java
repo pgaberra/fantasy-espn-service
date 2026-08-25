@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Refreshes the cached ESPN stat lines nightly, and once at startup when what's cached is
+ * Refreshes the cached ESPN player read model nightly, and once at startup when what's cached is
  * missing or old.
  *
  * <p>Staleness is what's checked, not emptiness. A deployment that changes what the sync
@@ -22,23 +22,23 @@ import java.util.Optional;
  * data didn't match the code. That happened twice while this service was being built.
  *
  * <p>A successful run is logged by the service itself; only failures are reported here, and a
- * failure is never fatal — the previous stat lines stay in place until the next attempt.
+ * failure is never fatal — the previous read model stays in place until the next attempt.
  */
 @Component
 public class EspnPlayerSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(EspnPlayerSyncScheduler.class);
 
-    private final EspnPlayerStatsService playerStatsService;
-    private final EspnPlayerStatsRepository repository;
+    private final EspnPlayerSyncService syncService;
+    private final EspnPlayerRepository repository;
     private final boolean syncOnStartup;
     private final Duration maxAge;
 
-    public EspnPlayerSyncScheduler(EspnPlayerStatsService playerStatsService,
-                                   EspnPlayerStatsRepository repository,
+    public EspnPlayerSyncScheduler(EspnPlayerSyncService syncService,
+                                   EspnPlayerRepository repository,
                                    @Value("${espn.player-sync-on-startup:true}") boolean syncOnStartup,
                                    @Value("${espn.player-stats-max-age:36h}") Duration maxAge) {
-        this.playerStatsService = playerStatsService;
+        this.syncService = syncService;
         this.repository = repository;
         this.syncOnStartup = syncOnStartup;
         this.maxAge = maxAge;
@@ -50,18 +50,18 @@ public class EspnPlayerSyncScheduler {
             return;
         }
         try {
-            playerStatsService.sync();
+            syncService.sync();
         } catch (Exception e) {
-            log.error("ESPN player stat sync at startup failed", e);
+            log.error("ESPN player sync at startup failed", e);
         }
     }
 
     @Scheduled(cron = "${espn.player-sync-cron:0 45 7 * * *}", zone = "UTC")
     public void syncDaily() {
         try {
-            playerStatsService.sync();
+            syncService.sync();
         } catch (Exception e) {
-            log.error("Nightly ESPN player stat sync failed", e);
+            log.error("Nightly ESPN player sync failed", e);
         }
     }
 

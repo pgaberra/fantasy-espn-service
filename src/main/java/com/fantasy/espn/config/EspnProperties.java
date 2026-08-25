@@ -22,11 +22,16 @@ public record EspnProperties(
         // found for it — e.g. the user hasn't renewed yet — the reader falls back to the season
         // before it.
         Integer season,
-        // The season the cached player stat lines are read for: the last season actually
-        // played, which is the one projections are seeded from. It trails {@code season} for
-        // most of the year, because ESPN opens a league year months before it is played and
-        // reports all-zero season totals for it in the meantime.
-        Integer playerStatsSeason,
+        // The season whose player pool is cached, as a *start* year: 2026 is the 2026-27
+        // season. ESPN's end-year convention stops at the player client, so every season below
+        // this line reads the way the rest of the app says it.
+        Integer playerPoolSeason,
+        // The season a cached stat line is a reference for: the last season actually played,
+        // which is the one projections are seeded from. It trails the pool season for most of
+        // the year, because ESPN opens a season months before it is played and reports all-zero
+        // totals for it in the meantime — so this is also the season a sync must find real
+        // numbers for before it is allowed to replace anything.
+        Integer playerReferenceSeason,
         // Base64-encoded 256-bit AES key used to encrypt stored espn_s2 / SWID cookies.
         String tokenEncryptionKey
 ) {

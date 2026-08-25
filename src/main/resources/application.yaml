@@ -45,12 +45,17 @@ espn:
   # A league missing for this season falls back to the one before it, so a manager who hasn't
   # renewed yet still syncs.
   season: ${ESPN_SEASON:2027}
-  # Season the cached player stat lines are read for, which is NOT the league season: leagues
-  # open months before a puck is dropped, and projections are seeded from the last season that
-  # was actually played. ESPN does publish season-total rows for the upcoming season — they are
-  # simply all zeroes — so pointing this at the league season would replace every stat line
-  # with nothing rather than fail loudly. Bump it once the current season has been played.
-  player-stats-season: ${ESPN_PLAYER_STATS_SEASON:2026}
+  # The player pool to cache, as a *start* year: 2026 is the 2026-27 season. Unlike the two
+  # settings around it this is not ESPN's end-year id — the player client converts, so the pool
+  # season, the reference season and the rest of the app all say a season the same way.
+  player-pool-season: ${ESPN_PLAYER_POOL_SEASON:2026}
+  # The season a cached stat line is a reference for (start year): the last season actually
+  # played, which is what projections are seeded from. It trails the pool season for most of
+  # the year, because ESPN opens a season months before it is played and publishes all-zero
+  # totals for it in the meantime. A sync refuses to replace anything unless it finds real
+  # games played for this season, so an off-by-one can't quietly zero the cache. Bump it once
+  # the pool season has been played.
+  player-reference-season: ${ESPN_PLAYER_REFERENCE_SEASON:2025}
   # When the cached stat lines are refreshed (UTC). ESPN's season totals change at most once a
   # day out of season, so a single nightly run is plenty.
   player-sync-cron: ${ESPN_PLAYER_SYNC_CRON:0 45 7 * * *}

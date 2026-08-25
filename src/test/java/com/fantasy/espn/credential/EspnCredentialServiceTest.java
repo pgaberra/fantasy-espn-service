@@ -23,7 +23,7 @@ class EspnCredentialServiceTest {
     @BeforeEach
     void setUp() {
         repository = mock(EspnCredentialRepository.class);
-        cipher = new TokenCipher(new EspnProperties(null, "fhl", 2026, 2026, KEY));
+        cipher = new TokenCipher(new EspnProperties(null, "fhl", 2027, 2026, 2025, KEY));
         service = new EspnCredentialService(repository, cipher);
     }
 
