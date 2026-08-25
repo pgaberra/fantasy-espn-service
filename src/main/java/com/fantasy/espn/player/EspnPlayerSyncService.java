@@ -33,6 +33,7 @@ public class EspnPlayerSyncService {
     private static final int MINIMUM_CREDIBLE_PLAYERS = 200;
 
     private final EspnPlayerClient client;
+    private final EspnHeadshotVerifier headshotVerifier;
     private final EspnPlayerRepository playerRepository;
     private final EspnSkaterSeasonRepository skaterSeasonRepository;
     private final EspnGoalieSeasonRepository goalieSeasonRepository;
@@ -43,12 +44,14 @@ public class EspnPlayerSyncService {
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     public EspnPlayerSyncService(EspnPlayerClient client,
+                                 EspnHeadshotVerifier headshotVerifier,
                                  EspnPlayerRepository playerRepository,
                                  EspnSkaterSeasonRepository skaterSeasonRepository,
                                  EspnGoalieSeasonRepository goalieSeasonRepository,
                                  TransactionTemplate transactionTemplate,
                                  EspnProperties props) {
         this.client = client;
+        this.headshotVerifier = headshotVerifier;
         this.playerRepository = playerRepository;
         this.skaterSeasonRepository = skaterSeasonRepository;
         this.goalieSeasonRepository = goalieSeasonRepository;
@@ -92,7 +95,9 @@ public class EspnPlayerSyncService {
                             + "; it has probably not been played yet. Preserving existing data");
         }
 
-        List<FetchedPlayer> pool = dedupe(fetched).stream()
+        // Only after the guards: there is no point asking the CDN about a fetch we are going
+        // to refuse, and no point checking the duplicates we are about to drop.
+        List<FetchedPlayer> pool = headshotVerifier.withVerifiedHeadshots(dedupe(fetched)).stream()
                 // A player ESPN no longer lists as active is kept while a stored season still
                 // has their numbers: someone who retired after the last season played is gone
                 // from the pool but their stat line is still what a projection references.
