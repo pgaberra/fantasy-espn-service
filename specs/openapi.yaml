@@ -105,6 +105,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PlayerStatsResponse"
+  /api/v1/espn/players/sync/latest:
+    get:
+      tags:
+      - ESPN Players
+      summary: "When the cached pool was last refreshed, and how many players it holds"
+      description: "For callers that only need to know whether the pool has moved,\
+        \ so they do not have to fetch the pool to find out."
+      operationId: lastSync
+      responses:
+        "200":
+          description: Sync status returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerSyncStatusResponse"
   /api/v1/espn/players/skaters:
     get:
       tags:
@@ -351,6 +366,20 @@ components:
           format: date-time
           description: When the cached stat lines were last refreshed from ESPN; absent
             while no sync has succeeded yet
+      required:
+      - players
+    PlayerSyncStatusResponse:
+      type: object
+      properties:
+        syncedAt:
+          type: string
+          format: date-time
+          description: When the pool was last refreshed from ESPN; absent while no
+            sync has succeeded yet
+        players:
+          type: integer
+          format: int64
+          description: Players stored
       required:
       - players
     SkaterResponse:

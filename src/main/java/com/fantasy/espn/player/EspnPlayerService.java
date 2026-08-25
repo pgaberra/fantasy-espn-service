@@ -4,6 +4,7 @@ import com.fantasy.espn.config.EspnProperties;
 import com.fantasy.espn.player.dto.GoalieResponse;
 import com.fantasy.espn.player.dto.PlayerStatLine;
 import com.fantasy.espn.player.dto.PlayerStatsResponse;
+import com.fantasy.espn.player.dto.PlayerSyncStatusResponse;
 import com.fantasy.espn.player.dto.SkaterResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,6 +85,16 @@ public class EspnPlayerService {
             }
         }
         return new PlayerStatsResponse(lines, syncedAt);
+    }
+
+    /**
+     * When the pool was last refreshed, for a caller whose only question is whether it has
+     * moved since they last looked.
+     */
+    @Transactional(readOnly = true)
+    public PlayerSyncStatusResponse lastSync() {
+        return new PlayerSyncStatusResponse(
+                playerRepository.findLastSyncedAt().orElse(null), playerRepository.count());
     }
 
     private Map<Long, EspnSkaterSeason> bySkaterId(int season) {

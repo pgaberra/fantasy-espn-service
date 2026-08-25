@@ -98,7 +98,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     would sit on it until the next nightly run with nothing to show the data didn't match the
     code. That happened twice while this service was being built.
   - `EspnPlayerController` — `GET /api/v1/espn/players/{skaters,goalies}?season=`,
-    `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
+    `GET /api/v1/espn/players`, `GET /api/v1/espn/players/sync/latest` (when the pool was last
+    written, for a caller whose only question is whether it has moved),
+    `POST /api/v1/espn/players/sync`.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
   `InternalApiKeyFilter` (API-key auth; exempts only the actuator health/info probes).

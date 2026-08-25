@@ -3,6 +3,7 @@ package com.fantasy.espn.player;
 import com.fantasy.espn.player.dto.GoalieResponse;
 import com.fantasy.espn.player.dto.PlayerStatsResponse;
 import com.fantasy.espn.player.dto.PlayerSyncResponse;
+import com.fantasy.espn.player.dto.PlayerSyncStatusResponse;
 import com.fantasy.espn.player.dto.SkaterResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -60,6 +61,15 @@ public class EspnPlayerController {
     @GetMapping
     public PlayerStatsResponse players() {
         return playerService.players();
+    }
+
+    @Operation(summary = "When the cached pool was last refreshed, and how many players it holds",
+            description = "For callers that only need to know whether the pool has moved, so "
+                    + "they do not have to fetch the pool to find out.")
+    @ApiResponses(@ApiResponse(responseCode = "200", description = "Sync status returned"))
+    @GetMapping("/sync/latest")
+    public PlayerSyncStatusResponse lastSync() {
+        return playerService.lastSync();
     }
 
     @Operation(summary = "Refresh the cached player read model from ESPN")

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -129,6 +130,24 @@ class EspnPlayerServiceTest {
         assertThat(goalie.eligiblePositions()).containsExactly("G");
         assertThat(goalie.wins()).isEqualTo(39);
         assertThat(goalie.overtimeLosses()).isEqualTo(4);
+    }
+
+    @Test
+    void lastSync_reportsWhenThePoolWasWrittenAndHowBigItIs() {
+        when(playerRepository.findLastSyncedAt()).thenReturn(Optional.of(SYNCED_AT));
+        when(playerRepository.count()).thenReturn(1686L);
+
+        assertThat(service.lastSync().syncedAt()).isEqualTo(SYNCED_AT);
+        assertThat(service.lastSync().players()).isEqualTo(1686L);
+    }
+
+    /** Nothing synced yet is a fact worth reporting, not an error. */
+    @Test
+    void lastSync_reportsNoTimeAtAllBeforeTheFirstSync() {
+        when(playerRepository.findLastSyncedAt()).thenReturn(Optional.empty());
+        when(playerRepository.count()).thenReturn(0L);
+
+        assertThat(service.lastSync().syncedAt()).isNull();
     }
 
     @Test
