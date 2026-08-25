@@ -16,18 +16,18 @@ import static org.mockito.Mockito.when;
 
 class EspnPlayerSyncSchedulerTest {
 
-    private EspnPlayerStatsService playerStatsService;
-    private EspnPlayerStatsRepository repository;
+    private EspnPlayerSyncService syncService;
+    private EspnPlayerRepository repository;
 
     @BeforeEach
     void setUp() {
-        playerStatsService = mock(EspnPlayerStatsService.class);
-        repository = mock(EspnPlayerStatsRepository.class);
-        when(playerStatsService.sync()).thenReturn(new PlayerSyncResponse(1700, Instant.now()));
+        syncService = mock(EspnPlayerSyncService.class);
+        repository = mock(EspnPlayerRepository.class);
+        when(syncService.sync()).thenReturn(new PlayerSyncResponse(1700, Instant.now()));
     }
 
     private EspnPlayerSyncScheduler scheduler(boolean syncOnStartup) {
-        return new EspnPlayerSyncScheduler(playerStatsService, repository, syncOnStartup, Duration.ofHours(36));
+        return new EspnPlayerSyncScheduler(syncService, repository, syncOnStartup, Duration.ofHours(36));
     }
 
     @Test
@@ -36,7 +36,7 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(playerStatsService).sync();
+        verify(syncService).sync();
     }
 
     @Test
@@ -47,7 +47,7 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(playerStatsService).sync();
+        verify(syncService).sync();
     }
 
     @Test
@@ -58,14 +58,14 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(playerStatsService, never()).sync();
+        verify(syncService, never()).sync();
     }
 
     @Test
     void startup_doesNothingWhenTurnedOff() {
         scheduler(false).syncOnStartupWhenStale();
 
-        verify(playerStatsService, never()).sync();
+        verify(syncService, never()).sync();
         verify(repository, never()).findLastSyncedAt();
     }
 
@@ -73,7 +73,7 @@ class EspnPlayerSyncSchedulerTest {
     void aFailedSyncNeverEscapesTheScheduler() {
         // ESPN being unreachable must not take the startup event or the cron thread down.
         when(repository.findLastSyncedAt()).thenReturn(Optional.empty());
-        when(playerStatsService.sync()).thenThrow(new IllegalStateException("ESPN unreachable"));
+        when(syncService.sync()).thenThrow(new IllegalStateException("ESPN unreachable"));
         EspnPlayerSyncScheduler scheduler = scheduler(true);
 
         assertThatNoException().isThrownBy(scheduler::syncOnStartupWhenStale);

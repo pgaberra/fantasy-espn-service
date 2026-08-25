@@ -7,6 +7,15 @@
         <Bug pattern="SPRING_ENDPOINT,EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD: the player read model is carried by wide JPA
+         entities with public fields (see EspnPlayer), which keeps them readable. A column
+         nothing but a repository query filters on — active, goalie — or that only the
+         database needs is written by us and read by Hibernate, which SpotBugs cannot see. -->
+    <Match>
+        <Class name="~com\.fantasy\.espn\.player\.Espn(Player|SkaterSeason|GoalieSeason)"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
     <!-- SERVLET_HEADER: InternalApiKeyFilter reads the X-Internal-Api-Key request
          header by design (the inter-service auth check), not a vulnerability. -->
     <Match>

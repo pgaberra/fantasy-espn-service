@@ -1,8 +1,11 @@
 # CLAUDE.md — fantasy-espn-service
 
 ESPN integration microservice for the fantasy hockey tool (SlapStat). It reads a user's
-ESPN fantasy **league settings** (scoring categories, roster positions, league size) and
-exposes a REST API the BFF consumes — mirroring `fantasy-yahoo-service`, but for ESPN.
+ESPN fantasy **league settings** (scoring categories, roster positions, league size) **and
+owns the cached player read model** — identity, ESPN eligible positions and season stat
+lines — exposing a REST API the BFF consumes. It mirrors `fantasy-yahoo-service`, but for
+ESPN, and takes over the player pool that service can no longer fetch: Yahoo refuses the
+game-wide player collection while our API access is pending.
 
 > ⚠️ Guarded by a shared `X-Internal-Api-Key` header (see `InternalApiKeyFilter`). Unlike
 > yahoo-service there is **no public endpoint and no OAuth callback** — ESPN has no public
@@ -64,23 +67,38 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams}`.
   - `dto/` — `LeagueSettingsResponse` (+ `StatCategory`, `RosterSlot`), `LeagueTeamsResponse`
     (+ `LeagueTeam`).
-- `player/` — cached season stat lines for the stats **Yahoo does not report**:
+- `player/` — the cached **player read model**: identity, ESPN's fantasy eligibility and one
+  stat line per player and season. It is the app's player source now that Yahoo refuses the
+  game-wide player collection, and it still serves the stats Yahoo never reported at all.
   - `EspnPlayerClient` — reads ESPN's *public* player endpoint
     (`/apis/v3/games/fhl/seasons/{season}/players?view=kona_player_info`). No league id and no
     cookies, which is what makes it usable for every user. The response is tens of MB (a split
-    per game per player), so it is **stream-parsed** one player at a time.
-  - `EspnPlayerStats` / `EspnPlayerStatsRepository` — JPA entity (`espn_player_stats`).
-  - `EspnPlayerStatsService` — sync (replace-all in one transaction; never wipes on an empty
-    fetch) + read. Drops ESPN's occasional duplicate player records, keeping the one that played
-    — keyed by name, position **and jersey**, because two different people do share a name and a
-    position (two Matt Murrays in goal, two Connor Murphys on defence) and collapsing them would
-    throw away a real season. The jersey is carried through for the BFF to break that same tie.
+    per game per player), so it is **stream-parsed** one player at a time. Maps `proTeamId` →
+    the abbreviation the app shows, `eligibleSlots` → positions, and derives what ESPN doesn't
+    report (shooting %, faceoff %, `avgToi` as "MM:SS"). `FetchedPlayer` / `FetchedSkaterSeason`
+    / `FetchedGoalieSeason` are what it returns.
+  - `EspnPlayer` + `EspnSkaterSeason` / `EspnGoalieSeason` (`@IdClass(PlayerSeasonId)`) — JPA
+    entities (`espn_players`, `espn_skater_seasons`, `espn_goalie_seasons`). Identity and
+    numbers are separate because their lifetimes are: the pool turns over between seasons
+    while a finished season's totals never change again.
+  - `EspnPlayerSyncService` — replace-all in one transaction, and never on thin evidence: it
+    refuses an empty fetch, a suspiciously short one, and a payload with no games played for
+    the reference season. Stores only the seasons that have actually been played — ESPN answers
+    for an unplayed season with all-zero rows, which would read as a scoreless season. Drops
+    ESPN's occasional duplicate player records, keeping the one that played — keyed by name,
+    position **and jersey**, because two different people do share a name and a position (two
+    Matt Murrays in goal, two Connor Murphys on defence) and collapsing them would throw away a
+    real season. A player ESPN no longer lists as active is kept while a stored season still
+    holds their numbers, because a projection still references them.
+  - `EspnPlayerService` — reads: the pool with a chosen season's stats, and the narrow
+    reference-season lines the BFF joins onto its own player list by name.
   - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is **missing or
     stale** (`espn.player-stats-max-age`, 36h). Staleness rather than emptiness: a deployment
     that changes what the sync stores leaves a full but outdated cache, and an empty-only check
     would sit on it until the next nightly run with nothing to show the data didn't match the
     code. That happened twice while this service was being built.
-  - `EspnPlayerController` — `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
+  - `EspnPlayerController` — `GET /api/v1/espn/players/{skaters,goalies}?season=`,
+    `GET /api/v1/espn/players`, `POST /api/v1/espn/players/sync`.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
   `InternalApiKeyFilter` (API-key auth; exempts only the actuator health/info probes).
@@ -99,11 +117,18 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   - goalies: `0 GS · 1 W · 2 L · 3 SA · 4 GA · 6 SV · 7 SO · 8 TOI (s) · 9 OTL · 10 GAA ·
     11 SV% · 12 win %`
   - `30 GP` is the universal games-played (skaters *and* goalies); `34` is skater-only.
-- **A season is keyed by the year it ends in:** `seasons/2027` is the 2026-27 season. ESPN
-  opens a league year months before it is played, so `espn.season` (leagues) and
-  `espn.player-stats-season` (the last season actually played) are **not** the same value for
-  most of the year. ESPN reports all-zero season totals for a season that hasn't started, so
-  pointing the stat sync at the league year empties the cache instead of failing.
+- **A season is keyed by the year it ends in:** `seasons/2027` is the 2026-27 season. That
+  convention stops at `EspnPlayerClient`, which converts: everything below it — the stored
+  rows, the `season` query param, `espn.player-pool-season`, `espn.player-reference-season` —
+  is a **start year**, the way the rest of the app says a season. `espn.season` (leagues) is
+  still ESPN's end-year id.
+- ESPN opens a season months before it is played, so the pool season and the reference season
+  are **not** the same value for most of the year. ESPN reports all-zero season totals for a
+  season that hasn't started, so pointing a stat read at the pool season would replace real
+  numbers with nothing rather than fail — hence the sync's refusal to store a season nobody
+  played, and its refusal to write at all unless the reference season has real games in it.
+- One fetch of the pool season carries **both** seasons: the upcoming one (identity and
+  eligibility) and the one just played (the totals a projection is seeded from).
 - **scoringType** lives at `settings.scoringSettings.scoringType`; the BFF collapses it to
   points vs category. League size = `settings.size`.
 - ESPN's v3 API is **unofficial** and can change shape without notice — keep all shape
@@ -117,8 +142,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   `token-encryption-key` (secret; defaults to empty so the app boots for tests/CI, credential
   endpoints just fail at call time when unset).
 - Secrets come **only** from env (`DB_PASSWORD`, `INTERNAL_API_KEY`, `TOKEN_ENCRYPTION_KEY`) —
-  never committed. Migrations live in `src/main/resources/db/migration/` (`V1`). Schema changes
-  = a new `V__` migration, never edit an applied one. Tests use H2 (`create-drop`, Flyway off).
+  never committed. Migrations live in `src/main/resources/db/migration/` (`V1`–`V4`). Schema
+  changes = a new `V__` migration, never edit an applied one. Tests use H2 (`create-drop`,
+  Flyway off) — the migrations themselves are first exercised by the staging deploy.
 
 ## Conventions
 
