@@ -23,6 +23,7 @@ class EspnPlayerServiceTest {
     private EspnPlayerRepository playerRepository;
     private EspnSkaterSeasonRepository skaterSeasonRepository;
     private EspnGoalieSeasonRepository goalieSeasonRepository;
+    private EspnPlayerSyncService syncService;
     private EspnPlayerService service;
 
     @BeforeEach
@@ -30,8 +31,9 @@ class EspnPlayerServiceTest {
         playerRepository = mock(EspnPlayerRepository.class);
         skaterSeasonRepository = mock(EspnSkaterSeasonRepository.class);
         goalieSeasonRepository = mock(EspnGoalieSeasonRepository.class);
+        syncService = mock(EspnPlayerSyncService.class);
         service = new EspnPlayerService(playerRepository, skaterSeasonRepository,
-                goalieSeasonRepository,
+                goalieSeasonRepository, syncService,
                 new EspnProperties("https://espn.test", "fhl", 2027, 2026, REFERENCE_SEASON, null));
     }
 
@@ -142,6 +144,16 @@ class EspnPlayerServiceTest {
     }
 
     /** Nothing synced yet is a fact worth reporting, not an error. */
+    /** A caller polls this to find out when a triggered sync is done. */
+    @Test
+    void lastSync_saysWhetherOneIsRunningRightNow() {
+        when(playerRepository.findLastSyncedAt()).thenReturn(Optional.of(SYNCED_AT));
+        when(playerRepository.count()).thenReturn(1659L);
+        when(syncService.isRunning()).thenReturn(true);
+
+        assertThat(service.lastSync().running()).isTrue();
+    }
+
     @Test
     void lastSync_reportsNoTimeAtAllBeforeTheFirstSync() {
         when(playerRepository.findLastSyncedAt()).thenReturn(Optional.empty());

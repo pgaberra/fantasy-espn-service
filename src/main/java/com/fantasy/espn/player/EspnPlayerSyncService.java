@@ -60,6 +60,41 @@ public class EspnPlayerSyncService {
         this.referenceSeason = props.playerReferenceSeason();
     }
 
+    public boolean isRunning() {
+        return running.get();
+    }
+
+    /**
+     * Starts a sync and returns as soon as it is under way. It fetches tens of megabytes from
+     * ESPN, parses the lot and asks the image CDN about every player — minutes of work, which
+     * is far too long to hold an HTTP request open across every hop between here and the
+     * caller. {@code GET /api/v1/espn/players/sync/latest} is how it is watched.
+     *
+     * <p>The flag is claimed here rather than inside the thread, so a caller that is told the
+     * sync started can rely on it having started, and a second caller is refused rather than
+     * queued. Already running is an ordinary answer, not a fault, so it comes back as
+     * {@code false} rather than as an exception.
+     *
+     * @return whether this call is the one that started it
+     */
+    public boolean startAsync() {
+        if (!running.compareAndSet(false, true)) {
+            return false;
+        }
+        Thread.ofVirtual().name("espn-player-sync").start(() -> {
+            try {
+                runSync();
+            } catch (Exception e) {
+                // Background work never reaches the @RestControllerAdvice, so it logs its own.
+                log.error("ESPN player sync failed", e);
+            } finally {
+                running.set(false);
+            }
+        });
+        return true;
+    }
+
+    /** Runs a sync and waits for it. For the scheduler, which has nobody to answer to. */
     public PlayerSyncResponse sync() {
         if (!running.compareAndSet(false, true)) {
             throw new IllegalStateException("A player sync is already running");

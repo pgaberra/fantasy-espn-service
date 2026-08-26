@@ -14,5 +14,9 @@ public record PlayerSyncStatusResponse(
                 + "has succeeded yet")
         Instant syncedAt,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Players stored")
-        long players) {
+        long players,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "Whether a sync is running right now. A triggered sync is watched "
+                        + "by polling this until it is false and syncedAt has moved.")
+        boolean running) {
 }

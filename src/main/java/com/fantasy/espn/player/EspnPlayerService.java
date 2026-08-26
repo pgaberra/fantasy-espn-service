@@ -28,12 +28,15 @@ public class EspnPlayerService {
     private final EspnPlayerRepository playerRepository;
     private final EspnSkaterSeasonRepository skaterSeasonRepository;
     private final EspnGoalieSeasonRepository goalieSeasonRepository;
+    private final EspnPlayerSyncService syncService;
     private final int referenceSeason;
 
     public EspnPlayerService(EspnPlayerRepository playerRepository,
                              EspnSkaterSeasonRepository skaterSeasonRepository,
                              EspnGoalieSeasonRepository goalieSeasonRepository,
+                             EspnPlayerSyncService syncService,
                              EspnProperties props) {
+        this.syncService = syncService;
         this.playerRepository = playerRepository;
         this.skaterSeasonRepository = skaterSeasonRepository;
         this.goalieSeasonRepository = goalieSeasonRepository;
@@ -94,7 +97,8 @@ public class EspnPlayerService {
     @Transactional(readOnly = true)
     public PlayerSyncStatusResponse lastSync() {
         return new PlayerSyncStatusResponse(
-                playerRepository.findLastSyncedAt().orElse(null), playerRepository.count());
+                playerRepository.findLastSyncedAt().orElse(null), playerRepository.count(),
+                syncService.isRunning());
     }
 
     private Map<Long, EspnSkaterSeason> bySkaterId(int season) {
