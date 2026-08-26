@@ -97,9 +97,10 @@ public class EspnPlayerClient {
             Map.entry(129764, "UTA"));
 
     /**
-     * ESPN's image CDN, asked for the size the player table draws. Every id here came out of
-     * ESPN's own player list, so the image resolves — a player without a portrait gets ESPN's
-     * placeholder rather than a 404.
+     * ESPN's image CDN, asked for the size the player table draws. The URL is built from the
+     * player's id and is therefore always producible — but ESPN has no picture for roughly one
+     * player in seven and answers those with a 404, so {@link EspnHeadshotVerifier} drops the
+     * ones that do not resolve before the pool is stored.
      */
     private static final String HEADSHOT_URL =
             "https://a.espncdn.com/combiner/i?img=/i/headshots/nhl/players/full/%d.png&w=64&h=64";

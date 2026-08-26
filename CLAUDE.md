@@ -90,6 +90,13 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     Matt Murrays in goal, two Connor Murphys on defence) and collapsing them would throw away a
     real season. A player ESPN no longer lists as active is kept while a stored season still
     holds their numbers, because a projection still references them.
+  - `EspnHeadshotVerifier` — the headshot URL is built from the player's id, so one can be
+    produced for anybody, but ESPN has no picture for roughly **one player in seven** and
+    answers those with a 404. Handing out such a URL puts a broken image in the app where a
+    player with no headshot at all would have drawn a placeholder, so the sync asks the CDN
+    (one HEAD each, eight at a time) and drops the ones that do not resolve. **Only a definite
+    404 drops a URL** — a timeout or a refusal keeps it, because a rate-limited sync must not
+    be able to strip the pool of every picture. Off with `ESPN_VERIFY_HEADSHOTS=false`.
   - `EspnPlayerService` — reads: the pool with a chosen season's stats, and the narrow
     reference-season lines the BFF joins onto its own player list by name.
   - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is **missing or

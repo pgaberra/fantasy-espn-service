@@ -44,7 +44,10 @@ class EspnPlayerSyncServiceTest {
             invocation.getArgument(0, Consumer.class).accept(mock(TransactionStatus.class));
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
-        service = new EspnPlayerSyncService(client, playerRepository, skaterSeasonRepository,
+        EspnHeadshotVerifier headshotVerifier = mock(EspnHeadshotVerifier.class);
+        when(headshotVerifier.withVerifiedHeadshots(any()))
+                .thenAnswer(call -> call.getArgument(0));
+        service = new EspnPlayerSyncService(client, headshotVerifier, playerRepository, skaterSeasonRepository,
                 goalieSeasonRepository, transactionTemplate,
                 new EspnProperties("https://espn.test", "fhl", 2027, POOL_SEASON, REFERENCE_SEASON, null));
     }
