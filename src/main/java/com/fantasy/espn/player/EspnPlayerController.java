@@ -2,14 +2,16 @@ package com.fantasy.espn.player;
 
 import com.fantasy.espn.player.dto.GoalieResponse;
 import com.fantasy.espn.player.dto.PlayerStatsResponse;
-import com.fantasy.espn.player.dto.PlayerSyncResponse;
 import com.fantasy.espn.player.dto.PlayerSyncStatusResponse;
+import com.fantasy.espn.player.dto.SyncAcceptedResponse;
 import com.fantasy.espn.player.dto.SkaterResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -72,13 +74,23 @@ public class EspnPlayerController {
         return playerService.lastSync();
     }
 
-    @Operation(summary = "Refresh the cached player read model from ESPN")
+    @Operation(summary = "Refresh the cached player read model from ESPN",
+            description = "Runs asynchronously and answers as soon as it is under way: the whole "
+                    + "player universe is fetched, parsed and checked against the image CDN, "
+                    + "which takes minutes. Watch it with GET /api/v1/espn/players/sync/latest "
+                    + "until running is false and syncedAt has moved.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Sync completed"),
-            @ApiResponse(responseCode = "502", description = "ESPN was unreachable or returned nothing")
+            @ApiResponse(responseCode = "202", description = "Sync started"),
+            @ApiResponse(responseCode = "409", description = "A sync is already running")
     })
     @PostMapping("/sync")
-    public PlayerSyncResponse sync() {
-        return syncService.sync();
+    public ResponseEntity<SyncAcceptedResponse> sync() {
+        // startAsync is the one place the claim is made, so two callers at once cannot both
+        // be told they started it.
+        if (!syncService.startAsync()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new SyncAcceptedResponse("running"));
+        }
+        return ResponseEntity.accepted().body(new SyncAcceptedResponse("started"));
     }
 }

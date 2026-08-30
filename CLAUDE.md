@@ -106,8 +106,14 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     code. That happened twice while this service was being built.
   - `EspnPlayerController` — `GET /api/v1/espn/players/{skaters,goalies}?season=`,
     `GET /api/v1/espn/players`, `GET /api/v1/espn/players/sync/latest` (when the pool was last
-    written, for a caller whose only question is whether it has moved),
-    `POST /api/v1/espn/players/sync`.
+    written and whether one is running — for a caller whose only question is whether it has
+    moved, and for watching a triggered sync), `POST /api/v1/espn/players/sync` → **202**, which
+    starts the work and answers. The work is minutes long (tens of megabytes fetched and parsed,
+    then a headshot check over the whole pool), and holding an HTTP request open across every
+    hop for that long is what made the synchronous version fragile — a client that gave up early
+    reported a failure that had not happened, while the write finished regardless. A second
+    trigger while one runs is **409**: `startAsync` makes the claim, so two callers cannot both
+    be told they started it.
 - `config/` — `OpenApiConfig` (pins server URL to `/`), `EspnProperties`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
   `InternalApiKeyFilter` (API-key auth; exempts only the actuator health/info probes).
