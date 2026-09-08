@@ -24,6 +24,7 @@ class EspnPlayerSyncSchedulerTest {
         syncService = mock(EspnPlayerSyncService.class);
         repository = mock(EspnPlayerRepository.class);
         when(syncService.sync()).thenReturn(new PlayerSyncResponse(1700, Instant.now()));
+        when(syncService.startAsync()).thenReturn(true);
     }
 
     private EspnPlayerSyncScheduler scheduler(boolean syncOnStartup) {
@@ -36,7 +37,7 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(syncService).sync();
+        verify(syncService).startAsync();
     }
 
     @Test
@@ -47,7 +48,19 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(syncService).sync();
+        verify(syncService).startAsync();
+    }
+
+    @Test
+    void startup_neverWaitsForTheSync() {
+        // ApplicationReadyEvent is delivered on the main thread, and a sync is minutes of work.
+        // Waiting for it once held startup open long enough for the container health check to
+        // call the service unhealthy and roll the production deployment back.
+        when(repository.findLastSyncedAt()).thenReturn(Optional.empty());
+
+        scheduler(true).syncOnStartupWhenStale();
+
+        verify(syncService, never()).sync();
     }
 
     @Test
@@ -58,14 +71,14 @@ class EspnPlayerSyncSchedulerTest {
 
         scheduler(true).syncOnStartupWhenStale();
 
-        verify(syncService, never()).sync();
+        verify(syncService, never()).startAsync();
     }
 
     @Test
     void startup_doesNothingWhenTurnedOff() {
         scheduler(false).syncOnStartupWhenStale();
 
-        verify(syncService, never()).sync();
+        verify(syncService, never()).startAsync();
         verify(repository, never()).findLastSyncedAt();
     }
 
@@ -74,6 +87,7 @@ class EspnPlayerSyncSchedulerTest {
         // ESPN being unreachable must not take the startup event or the cron thread down.
         when(repository.findLastSyncedAt()).thenReturn(Optional.empty());
         when(syncService.sync()).thenThrow(new IllegalStateException("ESPN unreachable"));
+        when(syncService.startAsync()).thenThrow(new IllegalStateException("ESPN unreachable"));
         EspnPlayerSyncScheduler scheduler = scheduler(true);
 
         assertThatNoException().isThrownBy(scheduler::syncOnStartupWhenStale);
