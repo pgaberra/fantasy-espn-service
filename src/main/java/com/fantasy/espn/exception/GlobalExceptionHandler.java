@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -46,6 +47,19 @@ public class GlobalExceptionHandler {
         // Raised when the upstream ESPN API call fails — a real failure, so log it.
         log.error("Upstream ESPN API call failed", e);
         return build(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+
+    /**
+     * A request for a path this service does not serve. Without this the catch-all turns it
+     * into a 500 with a full stack trace, which is wrong twice over: the caller asked for
+     * something that isn't here, and a 404 is an ordinary answer rather than a fault worth
+     * paging about. It fired for real — a BFF newer than the deployed copy of this service
+     * called GET /api/v1/espn/players, and every page of players in production logged an
+     * ERROR here and a second one in the BFF instead of one plain 404.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorDto> handleNoResource(NoResourceFoundException e) {
+        return build(HttpStatus.NOT_FOUND, "No resource found for the requested path");
     }
 
     @ExceptionHandler(Exception.class)
