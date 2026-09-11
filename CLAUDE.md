@@ -19,8 +19,13 @@ no token exchange/refresh, no signed state.
 - **Public leagues:** read with just a **league id + season** — no auth.
 - **Private leagues:** read using the user's **`espn_s2` + `SWID`** browser cookies, which the
   user copies manually. We store them **encrypted at rest** (`espn_credentials`, AES-GCM via
-  `TokenCipher`) keyed by the app user id, so they aren't re-entered. They are never returned
-  over the API (only a `hasCredentials` flag) and never logged.
+  `TokenCipher`) keyed by the app user id, so they aren't re-entered. They are never logged,
+  and they leave the service decrypted in exactly two ways: to the league reader, which sends
+  them to ESPN, and through `GET /api/v1/espn/credentials/values`, which returns them for the
+  `appUserId` the BFF passes (the BFF takes it from the caller's JWT and hands the values to the
+  web, whose ESPN import form prefills a user's own saved cookies). That read-back was a
+  deliberate trade-off in #11, so a change to request logging or XSS handling in the BFF or web
+  *can* expose these cookies.
 
 ## In one picture
 
@@ -58,7 +63,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     `app_user_id`; cookies stored AES-GCM encrypted.
   - `TokenCipher` — AES-GCM encrypt/decrypt (`TOKEN_ENCRYPTION_KEY`, base64 256-bit).
   - `EspnCredentialService` — save / delete / `hasCredentials` / `find` (decrypts to `EspnCookies`).
-  - `EspnCredentialController` — `PUT/GET/DELETE /api/v1/espn/credentials`.
+  - `EspnCredentialController` — `PUT/GET/DELETE /api/v1/espn/credentials` (the `GET` answers
+    only `hasCredentials`), and `GET /api/v1/espn/credentials/values`, which returns the
+    decrypted cookies (404 when none are stored).
 - `league/` — fantasy league reads:
   - `EspnFantasyClient` — `RestClient` over the ESPN v3 API; returns `JsonNode`; attaches the
     cookie header for private leagues; maps ESPN 401/403 → private-league (400), 404 → not-found.
@@ -165,8 +172,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 
 - **No code comments unless they aid the reader.** Prefer self-explanatory names.
 - Feature-package layout. Keep endpoints under `/api/v1`.
-- Cookies are **always encrypted at rest** — never store or log a raw cookie; never return
-  them (only `hasCredentials`). The encryption key comes only from env.
+- Cookies are **always encrypted at rest** — never store or log a raw cookie. Decrypted, they
+  go only to ESPN and back through `/credentials/values`; don't add a third way out. The
+  encryption key comes only from env.
 
 ### Error handling
 
