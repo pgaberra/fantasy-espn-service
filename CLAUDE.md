@@ -33,7 +33,7 @@ web (season + leagueId + optional cookies) → BFF → GET /api/v1/espn/leagues/
 
 ## Tech stack
 
-- Java 25, Spring Boot 4.0.5, Gradle (wrapper: `./gradlew`)
+- Java 25, Spring Boot 4.1.1, Gradle (wrapper: `./gradlew`)
 - Spring WebMVC (virtual threads), Spring Data JPA, Bean Validation, Actuator
 - `RestClient` for ESPN's v3 API; JDK `Cipher` (AES-GCM) for cookie encryption
 - PostgreSQL (runtime), Flyway migrations
