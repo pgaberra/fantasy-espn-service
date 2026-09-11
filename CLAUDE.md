@@ -118,7 +118,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   (`@ConfigurationProperties("espn")`), `EspnRestClientConfig` (the ESPN `RestClient`),
   `InternalApiKeyFilter` (API-key auth; exempts only the actuator health/info probes).
 - `exception/` — `EspnPrivateLeagueException` (→400), `EspnLeagueNotFoundException` (→404),
-  `ErrorDto`, `GlobalExceptionHandler`.
+  `EspnUpstreamException` (→502, thrown only where ESPN itself failed: `EspnFantasyClient`,
+  `EspnPlayerClient`, and a league document with no settings), `ErrorDto`, `GlobalExceptionHandler`.
+  Anything else, `IllegalStateException` included, is this service's own fault and answers 500.
 
 ## ESPN → projection mapping (hockey = `fhl`)
 
@@ -172,7 +174,8 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 
 The monorepo-wide rule (never silence an error; `ERROR` for 5xx, quiet for 4xx) lives in
 the root `CLAUDE.md`. The expected 4xx here are: private league / missing cookies → 400,
-no such league → 404, malformed id or season → 400.
+no such league → 404, malformed id or season → 400. Only `EspnUpstreamException` is a 502; don't
+throw it for a local fault, or the log blames ESPN for something ESPN never saw.
 
 ### OpenAPI annotations & spec snapshot (`specs/openapi.yaml`)
 

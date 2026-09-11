@@ -4,6 +4,7 @@ import com.fantasy.espn.config.EspnProperties;
 import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.exception.EspnPrivateLeagueException;
+import com.fantasy.espn.exception.EspnUpstreamException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -77,6 +78,6 @@ class EspnFantasyClientTest {
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThatThrownBy(() -> client.getLeague(2025, "123", null, "mSettings"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(EspnUpstreamException.class);
     }
 }
