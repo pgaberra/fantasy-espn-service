@@ -189,7 +189,9 @@ git add specs/openapi.yaml
 
 - `.github/workflows/pr-checks.yml`: `./gradlew build --no-daemon` on PRs to `master`.
 - `tag-on-merge.yml`: SemVer auto-tag + staging deploy on squash-merge (baseline `v0.1.0`).
-- `promote-to-prod.yml`: manual, version-pinned prod promotion.
+- `promote-to-prod.yml`: manual, version-pinned prod promotion. It checks the version production
+  actually serves, and a failure opens a `prod-promotion-failed` issue that the next promotion of
+  the latest release closes.
 - `@claude` mentions on issues/PRs trigger `.github/workflows/claude.yml`.
 
 ## Monorepo conventions
