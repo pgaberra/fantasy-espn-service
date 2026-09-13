@@ -8,8 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * ESPN has no public OAuth for fantasy, so there are no client credentials here. Public
  * leagues are read with only a league id; private leagues additionally need the user's
  * espn_s2 + SWID cookies, which are stored encrypted with {@code tokenEncryptionKey}. That
- * key comes from the environment and defaults to empty so the app still boots for tests/CI
- * — the credential endpoints simply fail at call time when it is unset.
+ * key comes only from the environment, with no default: {@code TokenCipher} refuses to start
+ * the service when it is missing or does not decode to 32 bytes. Tests supply their own.
  */
 @ConfigurationProperties(prefix = "espn")
 public record EspnProperties(
