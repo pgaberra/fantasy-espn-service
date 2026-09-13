@@ -33,8 +33,8 @@ internal:
 
 # ESPN Fantasy v3 API. ESPN has no public OAuth for fantasy: public leagues need only a
 # league id, private leagues need the user's espn_s2 + SWID cookies (stored encrypted, see
-# TOKEN_ENCRYPTION_KEY). The encryption key defaults to empty so the app still boots for
-# tests/CI — credential endpoints just fail at call time when it is unset.
+# TOKEN_ENCRYPTION_KEY). The encryption key has no default: the app refuses to start when it
+# is missing or doesn't decode to 32 bytes, so set it locally too; tests supply their own.
 espn:
   # Read host ESPN moved its fantasy reads to (April 2024): lm-api-reads.fantasy.espn.com.
   api-base-url: ${ESPN_API_BASE_URL:https://lm-api-reads.fantasy.espn.com}
@@ -73,7 +73,7 @@ espn:
   # eight at a time; turn off to sync without touching the CDN at all.
   verify-headshots: ${ESPN_VERIFY_HEADSHOTS:true}
   # Base64 256-bit AES key for encrypting stored cookies (openssl rand -base64 32).
-  token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
+  token-encryption-key: ${TOKEN_ENCRYPTION_KEY}
 
 springdoc:
   api-docs:

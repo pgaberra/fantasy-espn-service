@@ -163,8 +163,9 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 - `application.yaml`: datasource `jdbc:postgresql://…/${DB_NAME:fantasy_espn}`,
   `ddl-auto: validate` (Flyway owns the schema), `server.port=${PORT:8090}`.
 - `espn.*` — `api-base-url` (lm-api-reads.fantasy.espn.com), `game-key` (fhl),
-  `token-encryption-key` (secret; defaults to empty so the app boots for tests/CI, credential
-  endpoints just fail at call time when unset).
+  `token-encryption-key` (secret, no default; `TokenCipher` refuses to start the service when
+  it is missing or doesn't decode to 32 bytes, so a bad key fails the deploy rather than the
+  first cookie save. The test yaml supplies a non-secret key).
 - Secrets come **only** from env (`DB_PASSWORD`, `INTERNAL_API_KEY`, `TOKEN_ENCRYPTION_KEY`) —
   never committed. Migrations live in `src/main/resources/db/migration/` (`V1`–`V4`). Schema
   changes = a new `V__` migration, never edit an applied one. Tests use H2 (`create-drop`,
