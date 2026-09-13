@@ -72,7 +72,9 @@ public class EspnPlayerSyncScheduler {
     @Scheduled(cron = "${espn.player-sync-cron:0 45 7 * * *}", zone = "UTC")
     public void syncDaily() {
         try {
-            syncService.sync();
+            if (syncService.sync().isEmpty()) {
+                log.info("Nightly ESPN player sync skipped: a triggered sync is already running");
+            }
         } catch (Exception e) {
             log.error("Nightly ESPN player sync failed", e);
         }

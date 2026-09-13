@@ -113,7 +113,7 @@ class EspnPlayerSyncServiceTest {
         when(client.fetchPlayers(POOL_SEASON)).thenReturn(aSeasonOf(List.of(
                 skater(1L, "Connor McDavid", 97, List.of(skaterSeason(REFERENCE_SEASON, 82)))), 10));
 
-        PlayerSyncResponse result = service.sync();
+        PlayerSyncResponse result = service.sync().orElseThrow();
 
         assertThat(result.players()).isEqualTo(251);
         assertThat(savedPlayers())
