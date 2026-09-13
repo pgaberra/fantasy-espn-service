@@ -42,9 +42,14 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorDto> handleUpstreamFailure(IllegalStateException e) {
-        // Raised when the upstream ESPN API call fails — a real failure, so log it.
+    /**
+     * ESPN failed, so the answer is 502. Only the dedicated type gets here: this handler used to
+     * take every IllegalStateException, which also caught this service's own faults (a missing
+     * or wrong TOKEN_ENCRYPTION_KEY) and reported them as an ESPN outage although ESPN was never
+     * called. Those now reach the catch-all as the 500 they are.
+     */
+    @ExceptionHandler(EspnUpstreamException.class)
+    public ResponseEntity<ErrorDto> handleUpstreamFailure(EspnUpstreamException e) {
         log.error("Upstream ESPN API call failed", e);
         return build(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
