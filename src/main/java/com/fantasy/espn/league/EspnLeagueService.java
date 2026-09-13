@@ -4,6 +4,7 @@ import com.fantasy.espn.config.EspnProperties;
 import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.credential.EspnCredentialService;
 import com.fantasy.espn.exception.EspnLeagueNotFoundException;
+import com.fantasy.espn.exception.EspnUpstreamException;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
 import com.fantasy.espn.league.dto.LeagueTeam;
 import com.fantasy.espn.league.dto.LeagueTeamsResponse;
@@ -111,7 +112,7 @@ public class EspnLeagueService {
         JsonNode root = fetchLeague(season, id, cookies, "mSettings");
         JsonNode settings = root.path("settings");
         if (!settings.isObject()) {
-            throw new IllegalStateException("ESPN returned no settings for the league");
+            throw new EspnUpstreamException("ESPN returned no settings for the league");
         }
         JsonNode scoring = settings.path("scoringSettings");
         return new LeagueSettingsResponse(
