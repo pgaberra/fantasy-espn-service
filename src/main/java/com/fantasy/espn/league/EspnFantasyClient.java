@@ -4,6 +4,7 @@ import com.fantasy.espn.config.EspnProperties;
 import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.exception.EspnPrivateLeagueException;
+import com.fantasy.espn.exception.EspnUpstreamException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,17 +66,17 @@ public class EspnFantasyClient {
                 throw new EspnLeagueNotFoundException(
                         "ESPN league not found for the given id and season.");
             }
-            throw new IllegalStateException("ESPN API call failed (HTTP " + status + ")", e);
+            throw new EspnUpstreamException("ESPN API call failed (HTTP " + status + ")", e);
         } catch (RestClientException e) {
-            throw new IllegalStateException("ESPN API call failed: " + e.getMessage(), e);
+            throw new EspnUpstreamException("ESPN API call failed: " + e.getMessage(), e);
         }
         if (body == null || body.isBlank()) {
-            throw new IllegalStateException("ESPN API returned an empty body");
+            throw new EspnUpstreamException("ESPN API returned an empty body");
         }
         try {
             return objectMapper.readTree(body);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("ESPN API returned unparseable JSON", e);
+            throw new EspnUpstreamException("ESPN API returned unparseable JSON", e);
         }
     }
 }
