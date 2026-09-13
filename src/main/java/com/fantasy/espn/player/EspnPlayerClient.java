@@ -1,6 +1,7 @@
 package com.fantasy.espn.player;
 
 import com.fantasy.espn.config.EspnProperties;
+import com.fantasy.espn.exception.EspnUpstreamException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -142,13 +143,13 @@ public class EspnPlayerClient {
                     .exchange((request, response) -> {
                         int status = response.getStatusCode().value();
                         if (status < 200 || status >= 300) {
-                            throw new IllegalStateException(
+                            throw new EspnUpstreamException(
                                     "ESPN player call failed (HTTP " + status + ")");
                         }
                         return parse(response.getBody());
                     });
         } catch (RestClientException e) {
-            throw new IllegalStateException("ESPN player call failed: " + e.getMessage(), e);
+            throw new EspnUpstreamException("ESPN player call failed: " + e.getMessage(), e);
         }
     }
 
@@ -156,7 +157,7 @@ public class EspnPlayerClient {
         List<FetchedPlayer> players = new ArrayList<>();
         try (JsonParser parser = objectMapper.getFactory().createParser(body)) {
             if (parser.nextToken() != JsonToken.START_ARRAY) {
-                throw new IllegalStateException("ESPN player response was not a JSON array");
+                throw new EspnUpstreamException("ESPN player response was not a JSON array");
             }
             while (parser.nextToken() == JsonToken.START_OBJECT) {
                 JsonNode node = parser.readValueAsTree();
