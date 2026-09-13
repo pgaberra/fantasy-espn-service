@@ -84,6 +84,28 @@ class EspnPlayerSyncStartTest {
     }
 
     /**
+     * The nightly run overlapping a triggered one. It used to throw "already running", which the
+     * scheduler logged at ERROR as a failed sync although the triggered run was doing the work.
+     */
+    @Test
+    void sync_whileARunIsUnderWay_isEmptyRatherThanAFailure() throws Exception {
+        CountDownLatch fetching = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(client.fetchPlayers(anyInt())).thenAnswer(call -> {
+            fetching.countDown();
+            release.await(5, TimeUnit.SECONDS);
+            return List.of();
+        });
+        service.startAsync();
+        assertThat(fetching.await(5, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(service.sync()).isEmpty();
+
+        release.countDown();
+        await().atMost(5, TimeUnit.SECONDS).until(() -> !service.isRunning());
+    }
+
+    /**
      * A refused fetch is exactly what the guards are for, and it happens on a thread with no
      * request to fail. It must clear the flag regardless, or nothing can ever sync again.
      */

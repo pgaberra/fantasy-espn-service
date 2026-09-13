@@ -23,7 +23,7 @@ class EspnPlayerSyncSchedulerTest {
     void setUp() {
         syncService = mock(EspnPlayerSyncService.class);
         repository = mock(EspnPlayerRepository.class);
-        when(syncService.sync()).thenReturn(new PlayerSyncResponse(1700, Instant.now()));
+        when(syncService.sync()).thenReturn(Optional.of(new PlayerSyncResponse(1700, Instant.now())));
         when(syncService.startAsync()).thenReturn(true);
     }
 
@@ -80,6 +80,15 @@ class EspnPlayerSyncSchedulerTest {
 
         verify(syncService, never()).startAsync();
         verify(repository, never()).findLastSyncedAt();
+    }
+
+    @Test
+    void nightly_overlappingATriggeredSync_isAQuietSkip() {
+        // The run under way is doing the same work, so this is not a failed nightly run.
+        when(syncService.sync()).thenReturn(Optional.empty());
+
+        assertThatNoException().isThrownBy(scheduler(true)::syncDaily);
+        verify(syncService).sync();
     }
 
     @Test

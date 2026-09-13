@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -94,13 +95,19 @@ public class EspnPlayerSyncService {
         return true;
     }
 
-    /** Runs a sync and waits for it. For the scheduler, which has nobody to answer to. */
-    public PlayerSyncResponse sync() {
+    /**
+     * Runs a sync and waits for it. For the scheduler, which has nobody to answer to.
+     *
+     * @return the result, or empty when a sync was already running. That is an ordinary outcome
+     *     rather than a fault: the run under way is doing the same work. It used to throw, so a
+     *     nightly run that overlapped a triggered one logged a failed sync that never happened.
+     */
+    public Optional<PlayerSyncResponse> sync() {
         if (!running.compareAndSet(false, true)) {
-            throw new IllegalStateException("A player sync is already running");
+            return Optional.empty();
         }
         try {
-            return runSync();
+            return Optional.of(runSync());
         } finally {
             running.set(false);
         }
