@@ -2,6 +2,9 @@ package com.fantasy.espn.credential;
 
 import com.fantasy.espn.config.EspnProperties;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,14 +37,32 @@ class TokenCipherTest {
         assertThat(cipher.encrypt("same")).isNotEqualTo(cipher.encrypt("same"));
     }
 
-    @Test
-    void fails_whenKeyMissing() {
-        assertThatThrownBy(() -> cipher("").encrypt("x")).isInstanceOf(IllegalStateException.class);
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void refusesToBuild_whenKeyMissing(String key) {
+        // At construction, so a deployment without a key never starts, rather than starting
+        // healthy and failing the first user who saves cookies.
+        assertThatThrownBy(() -> cipher(key))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TOKEN_ENCRYPTION_KEY");
     }
 
     @Test
-    void fails_whenKeyWrongLength() {
-        assertThatThrownBy(() -> cipher("dG9vLXNob3J0").encrypt("x"))
-                .isInstanceOf(IllegalStateException.class);
+    void refusesToBuild_whenKeyWrongLength() {
+        assertThatThrownBy(() -> cipher("dG9vLXNob3J0"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("32 bytes");
+    }
+
+    @Test
+    void refusesToBuild_whenKeyIsNotBase64_withoutRepeatingIt() {
+        // Also what an unresolved ${TOKEN_ENCRYPTION_KEY} placeholder looks like once bound.
+        String notBase64 = "${TOKEN_ENCRYPTION_KEY}";
+
+        assertThatThrownBy(() -> cipher(notBase64))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageNotContaining(notBase64)
+                .hasNoCause();
     }
 }
