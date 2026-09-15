@@ -103,7 +103,11 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     player with no headshot at all would have drawn a placeholder, so the sync asks the CDN
     (one HEAD each, eight at a time) and drops the ones that do not resolve. **Only a definite
     404 drops a URL** — a timeout or a refusal keeps it, because a rate-limited sync must not
-    be able to strip the pool of every picture. Off with `ESPN_VERIFY_HEADSHOTS=false`.
+    be able to strip the pool of every picture. **Runs only where avatars are on**
+    (`players.avatars.enabled`, the same `PLAYER_AVATARS_ENABLED` the BFF reads, off by
+    default): the pictures are ESPN's photographs and we hold no licence to show them, so while
+    the BFF strips them the sync does not touch ESPN's CDN at all and stores the URLs unchecked.
+    It has no switch of its own; set the variable in both services or in neither.
   - `EspnPlayerService` — reads: the pool with a chosen season's stats, and the narrow
     reference-season lines the BFF joins onto its own player list by name.
   - `EspnPlayerSyncScheduler` — nightly, plus once at startup when the cache is **missing or

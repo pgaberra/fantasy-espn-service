@@ -67,13 +67,17 @@ espn:
   # How old the cache may be before a startup counts it as stale. Comfortably longer than the
   # nightly interval, so an ordinary restart doesn't re-fetch 33 MB for no reason.
   player-stats-max-age: ${ESPN_PLAYER_STATS_MAX_AGE:36h}
-  # Ask ESPN's image CDN which players it actually has a portrait for, and drop the headshot
-  # URL for the rest (roughly one player in seven). Without it the app renders a broken image
-  # where it would otherwise have drawn its own placeholder. One HEAD per player per sync,
-  # eight at a time; turn off to sync without touching the CDN at all.
-  verify-headshots: ${ESPN_VERIFY_HEADSHOTS:true}
   # Base64 256-bit AES key for encrypting stored cookies (openssl rand -base64 32).
   token-encryption-key: ${TOKEN_ENCRYPTION_KEY}
+
+# Whether the app shows players' pictures: the same PLAYER_AVATARS_ENABLED the BFF reads, and off
+# by default for the same reason — they are ESPN's photographs and we hold no licence to show them.
+# On, each sync asks ESPN's image CDN which players it actually has a portrait for (one HEAD per
+# player, eight at a time) and drops the headshot URL for the rest, roughly one in seven. Off, the
+# CDN is not touched at all. Set it in both services or neither.
+players:
+  avatars:
+    enabled: ${PLAYER_AVATARS_ENABLED:false}
 
 springdoc:
   api-docs:

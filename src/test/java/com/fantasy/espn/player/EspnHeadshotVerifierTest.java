@@ -83,8 +83,12 @@ class EspnHeadshotVerifierTest {
         server.verify();
     }
 
+    /**
+     * Where the app shows no pictures there is nothing to check them for, and ESPN's CDN is not
+     * asked a single thing: the players go through untouched.
+     */
     @Test
-    void checksNothingWhenTurnedOff() {
+    void checksNothingWhenAvatarsAreOff() {
         List<FetchedPlayer> players = List.of(player(1, CDN + "1"));
 
         assertThat(new EspnHeadshotVerifier(client, false).withVerifiedHeadshots(players))

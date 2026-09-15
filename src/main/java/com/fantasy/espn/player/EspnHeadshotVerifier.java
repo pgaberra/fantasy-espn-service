@@ -28,6 +28,12 @@ import java.util.concurrent.Future;
  * <p>Only a definite 404 drops a URL. A timeout, a refusal, anything else — the headshot stays:
  * the check is a courtesy, and a rate-limited sync must not be able to strip the whole pool of
  * its pictures.
+ *
+ * <p>Nothing is checked while the app shows no pictures ({@code players.avatars.enabled}, the same
+ * {@code PLAYER_AVATARS_ENABLED} the BFF reads, off by default). They are ESPN's photographs and we
+ * hold no licence to show them, so there is no reason to ask ESPN's CDN about them either; the BFF
+ * strips every headshot on the way out, and the URLs are stored unchecked. There is deliberately no
+ * switch of this check's own: whether we touch ESPN's pictures is one decision, not two.
  */
 @Component
 public class EspnHeadshotVerifier {
@@ -41,17 +47,20 @@ public class EspnHeadshotVerifier {
     private static final int CONCURRENT_CHECKS = 8;
 
     private final RestClient imageClient;
-    private final boolean enabled;
+    private final boolean avatarsEnabled;
 
     public EspnHeadshotVerifier(RestClient espnImageRestClient,
-                                @Value("${espn.verify-headshots:true}") boolean enabled) {
+                                @Value("${players.avatars.enabled:false}") boolean avatarsEnabled) {
         this.imageClient = espnImageRestClient;
-        this.enabled = enabled;
+        this.avatarsEnabled = avatarsEnabled;
     }
 
-    /** The players as they came in, minus the headshots ESPN has no picture behind. */
+    /**
+     * The players as they came in, minus the headshots ESPN has no picture behind — or exactly as
+     * they came in, without a single request to the CDN, where avatars are off.
+     */
     public List<FetchedPlayer> withVerifiedHeadshots(List<FetchedPlayer> players) {
-        if (!enabled) {
+        if (!avatarsEnabled) {
             return players;
         }
         Set<Long> missing = idsWithoutAPortrait(players);
