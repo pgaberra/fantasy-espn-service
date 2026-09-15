@@ -208,7 +208,6 @@ git add specs/openapi.yaml
 - `promote-to-prod.yml`: manual, version-pinned prod promotion. It checks the version production
   actually serves, and a failure opens a `prod-promotion-failed` issue that the next promotion of
   the latest release closes.
-- `@claude` mentions on issues/PRs trigger `.github/workflows/claude.yml`.
 
 ## Monorepo conventions
 
