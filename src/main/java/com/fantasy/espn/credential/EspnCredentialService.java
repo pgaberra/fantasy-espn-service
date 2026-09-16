@@ -10,9 +10,9 @@ import java.util.Optional;
  * Stores and retrieves a user's ESPN cookies (espn_s2 + SWID), encrypted at rest. Used to
  * read private leagues; public leagues need no credentials.
  *
- * The cookies leave this service two ways: as the {@link EspnCookies} handed to the league
- * reader, and through the controller's {@code /values} read, which exists so a user can be shown
- * their own saved connection. They are never logged.
+ * The cookies leave this service one way only: as the {@link EspnCookies} handed to the league
+ * reader. No endpoint returns them, not even to their owner, so an XSS or a stolen session cannot
+ * turn into a stolen ESPN login. They are never logged.
  */
 @Service
 public class EspnCredentialService {
