@@ -5,6 +5,9 @@ import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.credential.EspnCredentialService;
 import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.exception.EspnUpstreamException;
+import com.fantasy.espn.league.dto.AvailablePlayer;
+import com.fantasy.espn.player.EspnPlayerFields;
+import com.fantasy.espn.league.dto.EspnAvailability;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
 import com.fantasy.espn.league.dto.LeagueTeam;
 import com.fantasy.espn.league.dto.LeagueTeamsResponse;
@@ -122,6 +125,66 @@ public class EspnLeagueService {
                 intOrNull(settings.path("size")),
                 parseStatCategories(scoring.path("scoringItems")),
                 parseRosterSlots(settings.path("rosterSettings").path("lineupSlotCounts")));
+    }
+
+    /**
+     * The players the league has available, capped at {@code limit}.
+     *
+     * <p>ESPN answers this only for the league-scoped player document, so it needs the user's
+     * cookies like any private read: without them ESPN refuses and the caller gets the same 400 a
+     * private league gives. The ids are ESPN's own, as everywhere else here.
+     */
+    public List<AvailablePlayer> freeAgents(
+            String appUserId, Integer season, String leagueId, int limit) {
+        String id = requireNumericLeagueId(leagueId);
+        EspnCookies cookies = credentialService.find(appUserId).orElse(null);
+
+        JsonNode root = fetchAvailable(season, id, cookies, limit);
+        List<AvailablePlayer> available = new ArrayList<>();
+        // ESPN has served this document both as a bare array and wrapped in `players`.
+        JsonNode entries = root.isArray() ? root : root.path("players");
+        for (JsonNode entry : entries) {
+            AvailablePlayer player = toAvailablePlayer(entry);
+            if (player != null && available.size() < limit) {
+                available.add(player);
+            }
+        }
+        return List.copyOf(available);
+    }
+
+    private JsonNode fetchAvailable(Integer requestedSeason, String id, EspnCookies cookies, int limit) {
+        if (requestedSeason != null) {
+            requireValidSeason(requestedSeason);
+            return client.getAvailablePlayers(requestedSeason, id, cookies, limit);
+        }
+        try {
+            return client.getAvailablePlayers(configuredSeason, id, cookies, limit);
+        } catch (EspnLeagueNotFoundException notFoundForCurrentSeason) {
+            return client.getAvailablePlayers(configuredSeason - 1, id, cookies, limit);
+        }
+    }
+
+    /**
+     * One entry of the league's player document. The status lives on the pool entry and the
+     * identity on the player inside it, so both halves are read.
+     */
+    private static AvailablePlayer toAvailablePlayer(JsonNode entry) {
+        JsonNode player = entry.path("player").isObject() ? entry.path("player") : entry;
+        String position = EspnPlayerFields.position(player);
+        String fullName = text(player, "fullName");
+        if (position == null || fullName == null) {
+            return null;
+        }
+        String status = text(entry, "status");
+        return new AvailablePlayer(
+                player.path("id").asLong(),
+                fullName,
+                EspnPlayerFields.teamAbbrev(player),
+                position,
+                EspnPlayerFields.jerseyNumber(player),
+                position.equals("G"),
+                EspnPlayerFields.eligiblePositions(player, position),
+                EspnAvailability.of(status));
     }
 
     public LeagueTeamsResponse teams(String appUserId, Integer season, String leagueId) {

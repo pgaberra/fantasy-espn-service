@@ -70,10 +70,17 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
   - `EspnFantasyClient` — `RestClient` over the ESPN v3 API; returns `JsonNode`; attaches the
     cookie header for private leagues; maps ESPN 401/403 → private-league (400), 404 → not-found.
   - `EspnLeagueService` — parses ESPN's JSON into clean DTOs; holds the ESPN hockey **stat-id →
-    abbreviation** and **lineup-slot-id → position code** maps.
-  - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams}`.
+    abbreviation** map and the roster-slot names. How ESPN numbers **positions and clubs** lives in
+    `player/EspnPlayerFields`, shared with the pool sync: two documents carry the same player
+    shape, and a second copy of those maps is a position that goes wrong in one place only.
+  - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams,free-agents}`.
+    **Free agents** are the players no team in the league owns, free agents and waivers together,
+    read from the league-scoped player document with an `x-fantasy-filter` of
+    `filterStatus: [FREEAGENT, WAIVERS]` and sorted by percent owned across ESPN, which is the
+    nearest thing that document has to "best available". It needs the user's cookies like any
+    private read; `availability` is `UNKNOWN` rather than a guess where ESPN does not say.
   - `dto/` — `LeagueSettingsResponse` (+ `StatCategory`, `RosterSlot`), `LeagueTeamsResponse`
-    (+ `LeagueTeam`).
+    (+ `LeagueTeam`), `AvailablePlayer` (+ `EspnAvailability`).
 - `player/` — the cached **player read model**: identity, ESPN's fantasy eligibility and one
   stat line per player and season. It is the app's player source now that Yahoo refuses the
   game-wide player collection, and it still serves the stats Yahoo never reported at all.

@@ -13,6 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriBuilder;
+
+import java.net.URI;
+import java.util.function.Function;
 
 /**
  * Thin wrapper over the ESPN Fantasy v3 API. Returns raw Jackson {@link JsonNode} trees —
@@ -35,22 +39,62 @@ public class EspnFantasyClient {
     }
 
     /**
+     * Without an {@code x-fantasy-filter} ESPN serves one page of 50 players and gives no sign
+     * that the rest exist. The status filter is the point here: it asks the league for the players
+     * no team in it owns, which is a question only the league-scoped document can answer.
+     */
+    private static final String PLAYER_FILTER_HEADER = "x-fantasy-filter";
+    private static final String AVAILABLE_FILTER = """
+            {"players":{"filterStatus":{"value":["FREEAGENT","WAIVERS"]},"limit":%d,\
+            "sortPercOwned":{"sortAsc":false,"sortPriority":1}}}""";
+
+    /**
+     * The players a league has available: free agents and players on waivers, most owned across
+     * ESPN first, which is the closest thing its player document has to "best available".
+     */
+    public JsonNode getAvailablePlayers(int season, String leagueId, EspnCookies cookies, int limit) {
+        return fetch(
+                uriBuilder -> uriBuilder
+                        .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}/players")
+                        .queryParam("view", "kona_player_info")
+                        .build(gameKey, season, leagueId),
+                cookies,
+                AVAILABLE_FILTER.formatted(limit));
+    }
+
+    /**
      * A league document for the given season, restricted to the requested {@code views}
      * (e.g. {@code mSettings}, {@code mTeam}). When {@code cookies} is non-null they are sent so
      * ESPN will serve a private league.
      */
     public JsonNode getLeague(int season, String leagueId, EspnCookies cookies, String... views) {
+        return fetch(
+                uriBuilder -> uriBuilder
+                        .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}")
+                        .queryParam("view", (Object[]) views)
+                        .build(gameKey, season, leagueId),
+                cookies,
+                null);
+    }
+
+    /**
+     * One ESPN read: the user's cookies when there are any, an optional player filter, and the
+     * status mapping every caller depends on — a private league or stale cookies is the caller's
+     * 400, not a fault of ours, and only a failure ESPN itself reported is a 502.
+     */
+    private JsonNode fetch(
+            Function<UriBuilder, URI> uri, EspnCookies cookies, String playerFilter) {
         String body;
         try {
             body = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}")
-                            .queryParam("view", (Object[]) views)
-                            .build(gameKey, season, leagueId))
+                    .uri(uri)
                     .headers(headers -> {
                         if (cookies != null) {
                             headers.add(HttpHeaders.COOKIE,
                                     "espn_s2=" + cookies.espnS2() + "; SWID=" + cookies.swid());
+                        }
+                        if (playerFilter != null) {
+                            headers.add(PLAYER_FILTER_HEADER, playerFilter);
                         }
                     })
                     .retrieve()
