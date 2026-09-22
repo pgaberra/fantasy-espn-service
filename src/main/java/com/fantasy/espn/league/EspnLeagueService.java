@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -96,15 +97,15 @@ public class EspnLeagueService {
      * has no league there — a user who hasn't renewed for the coming season still syncs the
      * settings they play by. An explicit season overrides both.
      */
-    private JsonNode fetchLeague(Integer requestedSeason, String id, EspnCookies cookies, String view) {
+    private JsonNode fetchLeague(Integer requestedSeason, String id, EspnCookies cookies, String... views) {
         if (requestedSeason != null) {
             requireValidSeason(requestedSeason);
-            return client.getLeague(requestedSeason, id, cookies, view);
+            return client.getLeague(requestedSeason, id, cookies, views);
         }
         try {
-            return client.getLeague(configuredSeason, id, cookies, view);
+            return client.getLeague(configuredSeason, id, cookies, views);
         } catch (EspnLeagueNotFoundException notFoundForCurrentSeason) {
-            return client.getLeague(configuredSeason - 1, id, cookies, view);
+            return client.getLeague(configuredSeason - 1, id, cookies, views);
         }
     }
 
@@ -192,12 +193,33 @@ public class EspnLeagueService {
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
         String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
 
-        JsonNode root = fetchLeague(season, id, cookies, "mTeam");
+        JsonNode root = fetchLeague(season, id, cookies, "mTeam", "mSettings");
         List<LeagueTeam> teams = new ArrayList<>();
-        for (JsonNode team : root.path("teams")) {
+        for (JsonNode team : inDraftOrder(root.path("teams"), root.path("settings").path("draftSettings").path("pickOrder"))) {
             teams.add(new LeagueTeam(teamName(team), isMine(team, mySwid)));
         }
         return new LeagueTeamsResponse(teams);
+    }
+
+    /**
+     * The teams in the league's draft order ({@code draftSettings.pickOrder}, team ids in the order
+     * they pick in the first round), which a draft setup needs; ESPN lists {@code teams} by id. Any
+     * team the order does not name follows in ESPN's order, so a league without one is unchanged.
+     */
+    private static List<JsonNode> inDraftOrder(JsonNode teams, JsonNode pickOrder) {
+        Map<Integer, JsonNode> remaining = new LinkedHashMap<>();
+        for (JsonNode team : teams) {
+            remaining.put(team.path("id").asInt(Integer.MIN_VALUE), team);
+        }
+        List<JsonNode> ordered = new ArrayList<>();
+        for (JsonNode teamId : pickOrder) {
+            JsonNode team = remaining.remove(teamId.asInt(Integer.MIN_VALUE));
+            if (team != null) {
+                ordered.add(team);
+            }
+        }
+        ordered.addAll(remaining.values());
+        return ordered;
     }
 
     private static List<StatCategory> parseStatCategories(JsonNode scoringItems) {

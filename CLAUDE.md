@@ -74,6 +74,8 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     `player/EspnPlayerFields`, shared with the pool sync: two documents carry the same player
     shape, and a second copy of those maps is a position that goes wrong in one place only.
   - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams,free-agents}`.
+    `teams` reads `mTeam` + `mSettings` and returns the teams in `draftSettings.pickOrder`, the
+    league's draft order, which a draft setup imports; ESPN lists `teams` by id.
     **Free agents** are the players no team in the league owns, free agents and waivers together,
     read from the league-scoped player document with an `x-fantasy-filter` of
     `filterStatus: [FREEAGENT, WAIVERS]` and sorted by percent owned across ESPN, which is the
