@@ -115,7 +115,7 @@ class EspnLeagueServiceTest {
     void teams_marksTheUsersTeamViaSwid() {
         when(credentialService.find("u1")).thenReturn(Optional.of(new EspnCookies("s2", "{bbb-222}")));
         server.expect(requestTo(containsString(
-                        "/apis/v3/games/fhl/seasons/2025/segments/0/leagues/123?view=mTeam")))
+                        "/apis/v3/games/fhl/seasons/2025/segments/0/leagues/123?view=mTeam&view=mSettings")))
                 .andRespond(withSuccess(TEAMS_JSON, MediaType.APPLICATION_JSON));
 
         LeagueTeamsResponse teams = service.teams("u1", 2025, "123");
@@ -126,6 +126,28 @@ class EspnLeagueServiceTest {
         // "Beta" + "Squad"; owner {BBB-222} matches the user's SWID (case-insensitive, braces stripped).
         assertThat(teams.teams().get(1).name()).isEqualTo("Beta Squad");
         assertThat(teams.teams().get(1).mine()).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void teams_comeInTheLeaguesDraftOrder() {
+        when(credentialService.find("u1")).thenReturn(Optional.empty());
+        server.expect(requestTo(containsString("view=mTeam&view=mSettings")))
+                .andRespond(withSuccess("""
+                        {
+                          "settings": {"draftSettings": {"pickOrder": [3, 1, 2]}},
+                          "teams": [
+                            {"id": 1, "name": "Alpha"},
+                            {"id": 2, "name": "Bravo"},
+                            {"id": 3, "name": "Charlie"},
+                            {"id": 4, "name": "Delta"}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueTeamsResponse teams = service.teams("u1", 2025, "123");
+
+        assertThat(teams.teams()).extracting("name").containsExactly("Charlie", "Alpha", "Bravo", "Delta");
         server.verify();
     }
 
