@@ -126,6 +126,75 @@ class EspnLeagueServiceTest {
         // "Beta" + "Squad"; owner {BBB-222} matches the user's SWID (case-insensitive, braces stripped).
         assertThat(teams.teams().get(1).name()).isEqualTo("Beta Squad");
         assertThat(teams.teams().get(1).mine()).isTrue();
+        // ESPN named no pick order, so the list is its own team order: we do not know the seat.
+        assertThat(teams.draftPosition()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void teams_reportTheUsersSeatWhenEspnGivesThePickOrder() {
+        when(credentialService.find("u1")).thenReturn(Optional.of(new EspnCookies("s2", "{CCC-333}")));
+        server.expect(requestTo(containsString("view=mTeam&view=mSettings")))
+                .andRespond(withSuccess("""
+                        {
+                          "settings": {"draftSettings": {"pickOrder": [3, 1, 2]}},
+                          "teams": [
+                            {"id": 1, "name": "Alpha"},
+                            {"id": 2, "name": "Bravo", "owners": ["{ccc-333}"]},
+                            {"id": 3, "name": "Charlie"}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueTeamsResponse teams = service.teams("u1", 2025, "123");
+
+        assertThat(teams.teams()).extracting("name").containsExactly("Charlie", "Alpha", "Bravo");
+        assertThat(teams.draftPosition()).isEqualTo(3);
+        server.verify();
+    }
+
+    @Test
+    void teams_reportNoSeatWhenNoTeamIsTheUsers() {
+        // A public league read without cookies: no team is "mine", so there is nothing to report.
+        when(credentialService.find("u1")).thenReturn(Optional.empty());
+        server.expect(requestTo(containsString("view=mTeam&view=mSettings")))
+                .andRespond(withSuccess("""
+                        {
+                          "settings": {"draftSettings": {"pickOrder": [2, 1]}},
+                          "teams": [
+                            {"id": 1, "name": "Alpha"},
+                            {"id": 2, "name": "Bravo"}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueTeamsResponse teams = service.teams("u1", 2025, "123");
+
+        assertThat(teams.teams()).extracting("name").containsExactly("Bravo", "Alpha");
+        assertThat(teams.draftPosition()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void teams_reportNoSeatWhenThePickOrderDoesNotNameTheUsersTeam() {
+        // The user's team trails the named picks in ESPN's own order — its place is not a seat.
+        when(credentialService.find("u1")).thenReturn(Optional.of(new EspnCookies("s2", "{DDD-444}")));
+        server.expect(requestTo(containsString("view=mTeam&view=mSettings")))
+                .andRespond(withSuccess("""
+                        {
+                          "settings": {"draftSettings": {"pickOrder": [2, 1]}},
+                          "teams": [
+                            {"id": 1, "name": "Alpha"},
+                            {"id": 2, "name": "Bravo"},
+                            {"id": 3, "name": "Charlie", "owners": ["{DDD-444}"]}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        LeagueTeamsResponse teams = service.teams("u1", 2025, "123");
+
+        assertThat(teams.teams()).extracting("name").containsExactly("Bravo", "Alpha", "Charlie");
+        assertThat(teams.draftPosition()).isNull();
         server.verify();
     }
 

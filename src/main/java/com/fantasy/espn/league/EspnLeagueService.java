@@ -194,11 +194,40 @@ public class EspnLeagueService {
         String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
 
         JsonNode root = fetchLeague(season, id, cookies, "mTeam", "mSettings");
+        JsonNode pickOrder = root.path("settings").path("draftSettings").path("pickOrder");
         List<LeagueTeam> teams = new ArrayList<>();
-        for (JsonNode team : inDraftOrder(root.path("teams"), root.path("settings").path("draftSettings").path("pickOrder"))) {
-            teams.add(new LeagueTeam(teamName(team), isMine(team, mySwid)));
+        Integer draftPosition = null;
+        int seat = 0;
+        for (JsonNode team : inDraftOrder(root.path("teams"), pickOrder)) {
+            seat++;
+            boolean mine = isMine(team, mySwid);
+            if (mine && draftPosition == null && namesTeam(pickOrder, team)) {
+                draftPosition = seat;
+            }
+            teams.add(new LeagueTeam(teamName(team), mine));
         }
-        return new LeagueTeamsResponse(teams);
+        return new LeagueTeamsResponse(teams, draftPosition);
+    }
+
+    /**
+     * Whether ESPN's pick order names this team. Only then is its place in the returned list its
+     * real seat; a team the order does not name sits in ESPN's arbitrary team order, where a seat
+     * read off the list would be a guess presented as a fact.
+     */
+    private static boolean namesTeam(JsonNode pickOrder, JsonNode team) {
+        if (!pickOrder.isArray()) {
+            return false;
+        }
+        int teamId = team.path("id").asInt(Integer.MIN_VALUE);
+        if (teamId == Integer.MIN_VALUE) {
+            return false;
+        }
+        for (JsonNode pick : pickOrder) {
+            if (pick.asInt(Integer.MIN_VALUE) == teamId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
