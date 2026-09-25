@@ -73,7 +73,13 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     abbreviation** map and the roster-slot names. How ESPN numbers **positions and clubs** lives in
     `player/EspnPlayerFields`, shared with the pool sync: two documents carry the same player
     shape, and a second copy of those maps is a position that goes wrong in one place only.
-  - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams,free-agents}`.
+  - `EspnLeagueController` — `GET /api/v1/espn/leagues/{leagueId}/{settings,teams,draft,free-agents}`.
+    `draft` reads `mDraftDetail` + `mTeam` + `mSettings` for the draft room to follow a live draft:
+    status from `draftDetail.drafted`/`inProgress`, auction from `draftSettings.type`, the picks
+    made (ESPN player ids; the BFF maps them onto the pool's), and the teams in `pickOrder` —
+    or in the first round's picks when that order does not place every team; `orderKnown` says
+    whether either did. **Configured season only, no fallback**: last season's finished draft
+    would read as this one having ended.
     `teams` reads `mTeam` + `mSettings` and returns the teams in `draftSettings.pickOrder`, the
     league's draft order, which a draft setup imports; ESPN lists `teams` by id.
     **Free agents** are the players no team in the league owns, free agents and waivers together,
@@ -82,7 +88,7 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     nearest thing that document has to "best available". It needs the user's cookies like any
     private read; `availability` is `UNKNOWN` rather than a guess where ESPN does not say.
   - `dto/` — `LeagueSettingsResponse` (+ `StatCategory`, `RosterSlot`), `LeagueTeamsResponse`
-    (+ `LeagueTeam`), `AvailablePlayer` (+ `EspnAvailability`).
+    (+ `LeagueTeam`), `LeagueDraftResponse` (+ `LeagueDraftTeam`, `LeagueDraftPick`, `DraftStatus`), `AvailablePlayer` (+ `EspnAvailability`).
 - `player/` — the cached **player read model**: identity, ESPN's fantasy eligibility and one
   stat line per player and season. It is the app's player source now that Yahoo refuses the
   game-wide player collection, and it still serves the stats Yahoo never reported at all.
