@@ -1,6 +1,7 @@
 package com.fantasy.espn.league;
 
 import com.fantasy.espn.league.dto.AvailablePlayer;
+import com.fantasy.espn.league.dto.LeagueDraftResponse;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
 import com.fantasy.espn.league.dto.LeagueTeamsResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +62,22 @@ public class EspnLeagueController {
                                      @RequestParam String appUserId,
                                      @RequestParam(required = false) Integer season) {
         return leagueService.teams(appUserId, season, leagueId);
+    }
+
+    @Operation(summary = "Get a league's draft: its status, teams in draft order and the picks made so far",
+            description = "Read for the configured season only, never the one before: it is polled while "
+                    + "a draft room follows the live draft, and last season's finished draft would read as "
+                    + "this one having ended. Picks name players by ESPN's own ids.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Draft returned"),
+            @ApiResponse(responseCode = "400", description = "League is private (cookies missing/invalid) "
+                    + "or the league id is malformed"),
+            @ApiResponse(responseCode = "404", description = "No such ESPN league this season")
+    })
+    @GetMapping("/{leagueId}/draft")
+    public LeagueDraftResponse draft(@PathVariable @NotBlank @Size(max = 20) String leagueId,
+                                     @RequestParam @NotBlank @Size(max = 128) String appUserId) {
+        return leagueService.draft(appUserId, leagueId);
     }
 
     @Operation(summary = "List the players the league has available",
