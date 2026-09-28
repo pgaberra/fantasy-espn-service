@@ -13,8 +13,6 @@ import com.fantasy.espn.league.dto.LeagueDraftTeam;
 import com.fantasy.espn.player.EspnPlayerFields;
 import com.fantasy.espn.league.dto.EspnAvailability;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
-import com.fantasy.espn.league.dto.LeagueTeam;
-import com.fantasy.espn.league.dto.LeagueTeamsResponse;
 import com.fantasy.espn.league.dto.RosterSlot;
 import com.fantasy.espn.league.dto.StatCategory;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -195,27 +193,6 @@ public class EspnLeagueService {
                 EspnAvailability.of(status));
     }
 
-    public LeagueTeamsResponse teams(String appUserId, Integer season, String leagueId) {
-        String id = requireNumericLeagueId(leagueId);
-        EspnCookies cookies = credentialService.find(appUserId).orElse(null);
-        String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
-
-        JsonNode root = fetchLeague(season, id, cookies, "mTeam", "mSettings");
-        JsonNode pickOrder = root.path("settings").path("draftSettings").path("pickOrder");
-        List<LeagueTeam> teams = new ArrayList<>();
-        Integer draftPosition = null;
-        int seat = 0;
-        for (JsonNode team : inDraftOrder(root.path("teams"), pickOrder)) {
-            seat++;
-            boolean mine = isMine(team, mySwid);
-            if (mine && draftPosition == null && namesTeam(pickOrder, team)) {
-                draftPosition = seat;
-            }
-            teams.add(new LeagueTeam(teamName(team), mine));
-        }
-        return new LeagueTeamsResponse(teams, draftPosition);
-    }
-
     /**
      * The league's draft for the configured season: its status, its teams in draft order and the
      * picks made so far.
@@ -314,39 +291,10 @@ public class EspnLeagueService {
     }
 
     /**
-     * Whether ESPN's pick order names this team. Only then is its place in the returned list its
-     * real seat; a team the order does not name sits in ESPN's arbitrary team order, where a seat
-     * read off the list would be a guess presented as a fact.
+     * The teams in the given draft order (team ids in the order they pick in the first round);
+     * ESPN lists {@code teams} by id. Any team the order does not name follows in ESPN's order, so
+     * a league without one is unchanged.
      */
-    private static boolean namesTeam(JsonNode pickOrder, JsonNode team) {
-        if (!pickOrder.isArray()) {
-            return false;
-        }
-        int teamId = team.path("id").asInt(Integer.MIN_VALUE);
-        if (teamId == Integer.MIN_VALUE) {
-            return false;
-        }
-        for (JsonNode pick : pickOrder) {
-            if (pick.asInt(Integer.MIN_VALUE) == teamId) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * The teams in the league's draft order ({@code draftSettings.pickOrder}, team ids in the order
-     * they pick in the first round), which a draft setup needs; ESPN lists {@code teams} by id. Any
-     * team the order does not name follows in ESPN's order, so a league without one is unchanged.
-     */
-    private static List<JsonNode> inDraftOrder(JsonNode teams, JsonNode pickOrder) {
-        List<Integer> order = new ArrayList<>();
-        for (JsonNode teamId : pickOrder) {
-            order.add(teamId.asInt(Integer.MIN_VALUE));
-        }
-        return inDraftOrder(teams, order);
-    }
-
     private static List<JsonNode> inDraftOrder(JsonNode teams, List<Integer> order) {
         Map<Integer, JsonNode> remaining = new LinkedHashMap<>();
         for (JsonNode team : teams) {

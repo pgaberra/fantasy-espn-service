@@ -156,6 +156,22 @@ class EspnLeagueDraftTest {
     }
 
     @Test
+    void draft_namesATeamByLocationAndNicknameWhenItHasNoName() {
+        respond("""
+                {
+                  "draftDetail": {"inProgress": false, "picks": []},
+                  "settings": {"draftSettings": {"pickOrder": [1, 2]}},
+                  "teams": [
+                    {"id": 1, "location": "Beta", "nickname": "Squad"},
+                    {"id": 2}
+                  ]
+                }
+                """);
+
+        assertThat(service.draft("u1", "123").teams()).extracting("name").containsExactly("Beta Squad", "Team 2");
+    }
+
+    @Test
     void draft_isUnknownWithoutADraftDetail() {
         respond("{%s}".formatted(TEAMS));
 
