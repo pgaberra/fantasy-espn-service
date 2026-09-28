@@ -3,7 +3,6 @@ package com.fantasy.espn.league;
 import com.fantasy.espn.league.dto.AvailablePlayer;
 import com.fantasy.espn.league.dto.LeagueDraftResponse;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
-import com.fantasy.espn.league.dto.LeagueTeamsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -48,20 +47,6 @@ public class EspnLeagueController {
                                            @RequestParam String appUserId,
                                            @RequestParam(required = false) Integer season) {
         return leagueService.settings(appUserId, season, leagueId);
-    }
-
-    @Operation(summary = "List a league's teams (names + which is the user's own)")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Teams returned"),
-            @ApiResponse(responseCode = "400", description = "League is private (cookies missing/invalid) "
-                    + "or the league id/season is malformed"),
-            @ApiResponse(responseCode = "404", description = "No such ESPN league for the id and season")
-    })
-    @GetMapping("/{leagueId}/teams")
-    public LeagueTeamsResponse teams(@PathVariable String leagueId,
-                                     @RequestParam String appUserId,
-                                     @RequestParam(required = false) Integer season) {
-        return leagueService.teams(appUserId, season, leagueId);
     }
 
     @Operation(summary = "Get a league's draft: its status, teams in draft order and the picks made so far",
