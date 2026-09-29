@@ -2,6 +2,7 @@ package com.fantasy.espn.league;
 
 import com.fantasy.espn.league.dto.AvailablePlayer;
 import com.fantasy.espn.league.dto.LeagueDraftResponse;
+import com.fantasy.espn.league.dto.LeagueRostersResponse;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -63,6 +64,21 @@ public class EspnLeagueController {
     public LeagueDraftResponse draft(@PathVariable @NotBlank @Size(max = 20) String leagueId,
                                      @RequestParam @NotBlank @Size(max = 128) String appUserId) {
         return leagueService.draft(appUserId, leagueId);
+    }
+
+    @Operation(summary = "Get a league's teams and the players on each roster today",
+            description = "Read for the configured season only, never the one before: a league is ranked "
+                    + "on what its teams hold now. Players are named by ESPN's own ids.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Rosters returned"),
+            @ApiResponse(responseCode = "400", description = "League is private (cookies missing/invalid) "
+                    + "or the league id is malformed"),
+            @ApiResponse(responseCode = "404", description = "No such ESPN league this season")
+    })
+    @GetMapping("/{leagueId}/rosters")
+    public LeagueRostersResponse rosters(@PathVariable @NotBlank @Size(max = 20) String leagueId,
+                                         @RequestParam @NotBlank @Size(max = 128) String appUserId) {
+        return leagueService.rosters(appUserId, leagueId);
     }
 
     @Operation(summary = "List the players the league has available",
