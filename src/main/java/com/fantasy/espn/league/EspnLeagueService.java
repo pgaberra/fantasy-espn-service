@@ -7,9 +7,6 @@ import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.exception.EspnUpstreamException;
 import com.fantasy.espn.league.dto.AvailablePlayer;
 import com.fantasy.espn.league.dto.DraftStatus;
-import com.fantasy.espn.league.dto.LeagueDraftPick;
-import com.fantasy.espn.league.dto.LeagueDraftResponse;
-import com.fantasy.espn.league.dto.LeagueDraftTeam;
 import com.fantasy.espn.league.dto.LeagueRosterTeam;
 import com.fantasy.espn.league.dto.LeagueRostersResponse;
 import com.fantasy.espn.player.EspnPlayerFields;
@@ -21,9 +18,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -197,46 +191,12 @@ public class EspnLeagueService {
     }
 
     /**
-     * The league's draft for the configured season: its status, its teams in draft order and the
-     * picks made so far.
-     *
-     * <p>Unlike the settings read this never falls back to the season before. It is polled while
-     * a draft room follows the draft, and last season's finished draft would read as this one
-     * having ended.
-     */
-    public LeagueDraftResponse draft(String appUserId, String leagueId) {
-        String id = requireNumericLeagueId(leagueId);
-        EspnCookies cookies = credentialService.find(appUserId).orElse(null);
-        String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
-
-        JsonNode root = client.getLeague(configuredSeason, id, cookies, "mDraftDetail", "mTeam", "mSettings");
-        JsonNode draftSettings = root.path("settings").path("draftSettings");
-        JsonNode detail = root.path("draftDetail");
-        int teamCount = root.path("teams").size();
-        List<LeagueDraftPick> picks = parseDraftPicks(detail.path("picks"), teamCount);
-
-        List<Integer> order = draftOrder(draftSettings.path("pickOrder"), picks, root.path("teams"));
-        List<LeagueDraftTeam> teams = new ArrayList<>();
-        for (JsonNode team : inDraftOrder(root.path("teams"), order)) {
-            teams.add(new LeagueDraftTeam(team.path("id").asInt(), teamName(team), isMine(team, mySwid)));
-        }
-        return new LeagueDraftResponse(
-                id,
-                configuredSeason,
-                draftStatus(detail),
-                "AUCTION".equals(text(draftSettings, "type")),
-                teams,
-                !order.isEmpty(),
-                picks);
-    }
-
-    /**
      * The league's teams as they stand today, each with the players on its roster, for the
      * configured season.
      *
-     * <p>Like the draft this never falls back to the season before: a league ranked on last
-     * season's rosters would read as this one's, and one that has not drafted yet is an answer of
-     * its own (empty rosters) rather than a reason to look elsewhere.
+     * <p>Unlike the settings read this never falls back to the season before: a league ranked on
+     * last season's rosters would read as this one's, and one that has not drafted yet is an answer
+     * of its own (empty rosters) rather than a reason to look elsewhere.
      */
     public LeagueRostersResponse rosters(String appUserId, String leagueId) {
         String id = requireNumericLeagueId(leagueId);
@@ -278,80 +238,6 @@ public class EspnLeagueService {
             return DraftStatus.FINISHED;
         }
         return detail.path("inProgress").asBoolean(false) ? DraftStatus.IN_PROGRESS : DraftStatus.PRE_DRAFT;
-    }
-
-    /**
-     * The first-round order as team ids, but only when it places every team exactly once: from the
-     * pick order ESPN settles before the draft, or failing that from the first round's own picks
-     * once they have been made. A partial order is no order, and an empty list says so.
-     */
-    private static List<Integer> draftOrder(JsonNode pickOrder, List<LeagueDraftPick> picks, JsonNode teams) {
-        Set<Integer> teamIds = new HashSet<>();
-        for (JsonNode team : teams) {
-            teamIds.add(team.path("id").asInt(Integer.MIN_VALUE));
-        }
-        List<Integer> fromSettings = new ArrayList<>();
-        for (JsonNode teamId : pickOrder) {
-            fromSettings.add(teamId.asInt(Integer.MIN_VALUE));
-        }
-        if (placesEveryTeam(fromSettings, teamIds)) {
-            return fromSettings;
-        }
-        List<Integer> fromFirstRound = picks.stream()
-                .filter(pick -> pick.round() == 1)
-                .map(LeagueDraftPick::teamId)
-                .toList();
-        return placesEveryTeam(fromFirstRound, teamIds) ? fromFirstRound : List.of();
-    }
-
-    private static boolean placesEveryTeam(List<Integer> order, Set<Integer> teamIds) {
-        return !teamIds.isEmpty() && order.size() == teamIds.size() && new HashSet<>(order).equals(teamIds);
-    }
-
-    /**
-     * The picks made, by overall number. ESPN numbers each pick overall and within its round;
-     * the overall number is derived from the round's where it is missing. An entry with no player
-     * is not a pick yet.
-     */
-    private static List<LeagueDraftPick> parseDraftPicks(JsonNode entries, int teamCount) {
-        List<LeagueDraftPick> picks = new ArrayList<>();
-        for (JsonNode entry : entries) {
-            long playerId = entry.path("playerId").asLong(-1);
-            int teamId = entry.path("teamId").asInt(Integer.MIN_VALUE);
-            int round = entry.path("roundId").asInt(0);
-            int overall = entry.path("overallPickNumber").asInt(0);
-            int roundPick = entry.path("roundPickNumber").asInt(0);
-            if (overall <= 0 && round > 0 && roundPick > 0 && teamCount > 0) {
-                overall = (round - 1) * teamCount + roundPick;
-            }
-            if (playerId <= 0 || teamId == Integer.MIN_VALUE || overall <= 0) {
-                continue;
-            }
-            picks.add(new LeagueDraftPick(overall, round, teamId, playerId, entry.path("keeper").asBoolean(false)));
-        }
-        picks.sort(Comparator.comparingInt(LeagueDraftPick::pick));
-        return picks;
-    }
-
-    /**
-     * The teams in the given draft order (team ids in the order they pick in the first round);
-     * ESPN lists {@code teams} by id. Any team the order does not name follows in ESPN's order, so
-     * a league without one is unchanged.
-     */
-    private static List<JsonNode> inDraftOrder(JsonNode teams, List<Integer> order) {
-        Map<Integer, JsonNode> remaining = new LinkedHashMap<>();
-        for (JsonNode team : teams) {
-            remaining.put(team.path("id").asInt(Integer.MIN_VALUE), team);
-        }
-        List<JsonNode> ordered = new ArrayList<>();
-        for (int teamId : order) {
-            JsonNode team = remaining.remove(teamId);
-            if (team != null) {
-                ordered.add(team);
-            }
-        }
-        ordered.addAll(remaining.values());
-        return ordered;
     }
 
     private static List<StatCategory> parseStatCategories(JsonNode scoringItems) {
