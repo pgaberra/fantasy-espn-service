@@ -10,6 +10,8 @@ import com.fantasy.espn.league.dto.DraftStatus;
 import com.fantasy.espn.league.dto.LeagueDraftPick;
 import com.fantasy.espn.league.dto.LeagueDraftResponse;
 import com.fantasy.espn.league.dto.LeagueDraftTeam;
+import com.fantasy.espn.league.dto.LeagueRosterTeam;
+import com.fantasy.espn.league.dto.LeagueRostersResponse;
 import com.fantasy.espn.player.EspnPlayerFields;
 import com.fantasy.espn.league.dto.EspnAvailability;
 import com.fantasy.espn.league.dto.LeagueSettingsResponse;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -225,6 +228,46 @@ public class EspnLeagueService {
                 teams,
                 !order.isEmpty(),
                 picks);
+    }
+
+    /**
+     * The league's teams as they stand today, each with the players on its roster, for the
+     * configured season.
+     *
+     * <p>Like the draft this never falls back to the season before: a league ranked on last
+     * season's rosters would read as this one's, and one that has not drafted yet is an answer of
+     * its own (empty rosters) rather than a reason to look elsewhere.
+     */
+    public LeagueRostersResponse rosters(String appUserId, String leagueId) {
+        String id = requireNumericLeagueId(leagueId);
+        EspnCookies cookies = credentialService.find(appUserId).orElse(null);
+        String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
+
+        JsonNode root = client.getLeague(
+                configuredSeason, id, cookies, "mRoster", "mTeam", "mSettings", "mDraftDetail");
+        List<LeagueRosterTeam> teams = new ArrayList<>();
+        for (JsonNode team : root.path("teams")) {
+            teams.add(new LeagueRosterTeam(
+                    team.path("id").asInt(), teamName(team), isMine(team, mySwid), rosteredPlayers(team)));
+        }
+        return new LeagueRostersResponse(
+                id,
+                configuredSeason,
+                text(root.path("settings"), "name"),
+                draftStatus(root.path("draftDetail")),
+                teams);
+    }
+
+    /** The players on a team's roster, once each; an entry with no player is an empty slot. */
+    private static List<Long> rosteredPlayers(JsonNode team) {
+        Set<Long> players = new LinkedHashSet<>();
+        for (JsonNode entry : team.path("roster").path("entries")) {
+            long playerId = entry.path("playerId").asLong(-1);
+            if (playerId > 0) {
+                players.add(playerId);
+            }
+        }
+        return List.copyOf(players);
     }
 
     static DraftStatus draftStatus(JsonNode detail) {
