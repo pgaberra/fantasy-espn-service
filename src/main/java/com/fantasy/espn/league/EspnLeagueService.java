@@ -138,11 +138,11 @@ public class EspnLeagueService {
      * private league gives. The ids are ESPN's own, as everywhere else here.
      */
     public List<AvailablePlayer> freeAgents(
-            String appUserId, Integer season, String leagueId, int limit) {
+            String appUserId, Integer season, String leagueId, String position, int limit) {
         String id = requireNumericLeagueId(leagueId);
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
 
-        JsonNode root = fetchAvailable(season, id, cookies, limit);
+        JsonNode root = fetchAvailable(season, id, cookies, position, limit);
         List<AvailablePlayer> available = new ArrayList<>();
         // ESPN has served this document both as a bare array and wrapped in `players`.
         JsonNode entries = root.isArray() ? root : root.path("players");
@@ -155,15 +155,16 @@ public class EspnLeagueService {
         return List.copyOf(available);
     }
 
-    private JsonNode fetchAvailable(Integer requestedSeason, String id, EspnCookies cookies, int limit) {
+    private JsonNode fetchAvailable(
+            Integer requestedSeason, String id, EspnCookies cookies, String position, int limit) {
         if (requestedSeason != null) {
             requireValidSeason(requestedSeason);
-            return client.getAvailablePlayers(requestedSeason, id, cookies, limit);
+            return client.getAvailablePlayers(requestedSeason, id, cookies, position, limit);
         }
         try {
-            return client.getAvailablePlayers(configuredSeason, id, cookies, limit);
+            return client.getAvailablePlayers(configuredSeason, id, cookies, position, limit);
         } catch (EspnLeagueNotFoundException notFoundForCurrentSeason) {
-            return client.getAvailablePlayers(configuredSeason - 1, id, cookies, limit);
+            return client.getAvailablePlayers(configuredSeason - 1, id, cookies, position, limit);
         }
     }
 

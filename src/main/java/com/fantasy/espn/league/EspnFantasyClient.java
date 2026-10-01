@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriBuilder;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -45,21 +46,45 @@ public class EspnFantasyClient {
      */
     private static final String PLAYER_FILTER_HEADER = "x-fantasy-filter";
     private static final String AVAILABLE_FILTER = """
-            {"players":{"filterStatus":{"value":["FREEAGENT","WAIVERS"]},"limit":%d,\
+            {"players":{"filterStatus":{"value":["FREEAGENT","WAIVERS"]},%s"limit":%d,\
             "sortPercOwned":{"sortAsc":false,"sortPriority":1}}}""";
+
+    /** The positions a league's available players can be narrowed to. */
+    public static final String POSITION_PATTERN = "^(C|LW|RW|D|G)$";
+
+    /**
+     * ESPN filters players by lineup slot, whose ids number the positions differently from
+     * defaultPositionId (see {@code EspnPlayerFields}).
+     */
+    private static final Map<String, Integer> POSITION_SLOT =
+            Map.of("C", 0, "LW", 1, "RW", 2, "D", 4, "G", 5);
 
     /**
      * The players a league has available: free agents and players on waivers, most owned across
      * ESPN first, which is the closest thing its player document has to "best available".
+     * A {@code position} narrows them to the players eligible there, so a caller can read a
+     * position's whole wire instead of the few that make a mixed top list.
      */
-    public JsonNode getAvailablePlayers(int season, String leagueId, EspnCookies cookies, int limit) {
+    public JsonNode getAvailablePlayers(
+            int season, String leagueId, EspnCookies cookies, String position, int limit) {
         return fetch(
                 uriBuilder -> uriBuilder
                         .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}/players")
                         .queryParam("view", "kona_player_info")
                         .build(gameKey, season, leagueId),
                 cookies,
-                AVAILABLE_FILTER.formatted(limit));
+                AVAILABLE_FILTER.formatted(slotFilter(position), limit));
+    }
+
+    private static String slotFilter(String position) {
+        if (position == null) {
+            return "";
+        }
+        Integer slot = POSITION_SLOT.get(position);
+        if (slot == null) {
+            throw new IllegalArgumentException("Not a player position: " + position);
+        }
+        return "\"filterSlotIds\":{\"value\":[" + slot + "]},";
     }
 
     /**
