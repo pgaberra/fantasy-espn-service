@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -97,9 +98,42 @@ class EspnFreeAgentsTest {
                 .andExpect(header("x-fantasy-filter", containsString("\"limit\":150")))
                 .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
 
-        service.freeAgents("u1", null, "123", 150);
+        service.freeAgents("u1", null, "123", null, 150);
 
         server.verify();
+    }
+
+    @Test
+    void narrowsToOnePositionsLineupSlotWhenAsked() {
+        when(credentialService.find("u1")).thenReturn(Optional.empty());
+        server.expect(requestTo(containsString("/leagues/123/players")))
+                .andExpect(header("x-fantasy-filter", containsString("\"filterSlotIds\":{\"value\":[5]}")))
+                .andExpect(header("x-fantasy-filter", containsString("\"FREEAGENT\",\"WAIVERS\"")))
+                .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
+
+        service.freeAgents("u1", null, "123", "G", 50);
+
+        server.verify();
+    }
+
+    @Test
+    void sendsNoSlotFilterWithoutAPosition() {
+        when(credentialService.find("u1")).thenReturn(Optional.empty());
+        server.expect(requestTo(containsString("/leagues/123/players")))
+                .andExpect(header("x-fantasy-filter", not(containsString("filterSlotIds"))))
+                .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
+
+        service.freeAgents("u1", null, "123", null, 50);
+
+        server.verify();
+    }
+
+    @Test
+    void refusesAPositionOutsideTheAllowList() {
+        when(credentialService.find("u1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.freeAgents("u1", null, "123", "F", 50))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -108,7 +142,7 @@ class EspnFreeAgentsTest {
         server.expect(requestTo(containsString("/leagues/123/players")))
                 .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
 
-        List<AvailablePlayer> available = service.freeAgents("u1", null, "123", 150);
+        List<AvailablePlayer> available = service.freeAgents("u1", null, "123", null, 150);
 
         // The player with no position is dropped: there is nothing to start him at.
         assertThat(available).hasSize(3);
@@ -141,7 +175,7 @@ class EspnFreeAgentsTest {
         server.expect(requestTo(containsString("/leagues/123/players")))
                 .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
 
-        assertThat(service.freeAgents("u1", null, "123", 2)).hasSize(2);
+        assertThat(service.freeAgents("u1", null, "123", null, 2)).hasSize(2);
     }
 
     @Test
@@ -152,7 +186,7 @@ class EspnFreeAgentsTest {
         server.expect(requestTo(containsString("/seasons/2025/")))
                 .andRespond(withSuccess(AVAILABLE_JSON, MediaType.APPLICATION_JSON));
 
-        assertThat(service.freeAgents("u1", null, "123", 150)).isNotEmpty();
+        assertThat(service.freeAgents("u1", null, "123", null, 150)).isNotEmpty();
         server.verify();
     }
 
@@ -162,13 +196,13 @@ class EspnFreeAgentsTest {
         server.expect(requestTo(containsString("/leagues/123/players")))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
-        assertThatThrownBy(() -> service.freeAgents("u1", 2026, "123", 150))
+        assertThatThrownBy(() -> service.freeAgents("u1", 2026, "123", null, 150))
                 .isInstanceOf(EspnPrivateLeagueException.class);
     }
 
     @Test
     void aMalformedLeagueIdIsRefusedBeforeEspnIsAsked() {
-        assertThatThrownBy(() -> service.freeAgents("u1", null, "not-a-league", 150))
+        assertThatThrownBy(() -> service.freeAgents("u1", null, "not-a-league", null, 150))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
