@@ -16,6 +16,10 @@ public record LeagueRosterTeam(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
                 description = "ESPN's ids for the players on the team's roster, bench and injured "
                         + "reserve included. Empty before the team has drafted anyone.")
-        List<Long> playerIds
+        List<Long> playerIds,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "The same players as playerIds, in the same order, each with name, club, "
+                        + "positions, today's slot and injury status.")
+        List<LeagueRosterPlayer> players
 ) {
 }

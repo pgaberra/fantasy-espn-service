@@ -7,6 +7,7 @@ import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.exception.EspnUpstreamException;
 import com.fantasy.espn.league.dto.AvailablePlayer;
 import com.fantasy.espn.league.dto.DraftStatus;
+import com.fantasy.espn.league.dto.LeagueRosterPlayer;
 import com.fantasy.espn.league.dto.LeagueRosterTeam;
 import com.fantasy.espn.league.dto.LeagueRostersResponse;
 import com.fantasy.espn.player.EspnPlayerFields;
@@ -208,8 +209,10 @@ public class EspnLeagueService {
                 configuredSeason, id, cookies, "mRoster", "mTeam", "mSettings", "mDraftDetail");
         List<LeagueRosterTeam> teams = new ArrayList<>();
         for (JsonNode team : root.path("teams")) {
+            List<LeagueRosterPlayer> players = rosteredPlayers(team);
             teams.add(new LeagueRosterTeam(
-                    team.path("id").asInt(), teamName(team), isMine(team, mySwid), rosteredPlayers(team)));
+                    team.path("id").asInt(), teamName(team), isMine(team, mySwid),
+                    players.stream().map(LeagueRosterPlayer::espnId).toList(), players));
         }
         return new LeagueRostersResponse(
                 id,
@@ -220,15 +223,41 @@ public class EspnLeagueService {
     }
 
     /** The players on a team's roster, once each; an entry with no player is an empty slot. */
-    private static List<Long> rosteredPlayers(JsonNode team) {
-        Set<Long> players = new LinkedHashSet<>();
+    private static List<LeagueRosterPlayer> rosteredPlayers(JsonNode team) {
+        Set<Long> seen = new LinkedHashSet<>();
+        List<LeagueRosterPlayer> players = new ArrayList<>();
         for (JsonNode entry : team.path("roster").path("entries")) {
             long playerId = entry.path("playerId").asLong(-1);
-            if (playerId > 0) {
-                players.add(playerId);
+            if (playerId > 0 && seen.add(playerId)) {
+                players.add(rosterPlayer(playerId, entry));
             }
         }
         return List.copyOf(players);
+    }
+
+    /**
+     * A roster entry: the slot is on the entry, the identity on the pool entry's player. A healthy
+     * player's ACTIVE (or NORMAL) status is reported as no status at all.
+     */
+    private static LeagueRosterPlayer rosterPlayer(long playerId, JsonNode entry) {
+        JsonNode player = entry.path("playerPoolEntry").path("player");
+        String position = EspnPlayerFields.position(player);
+        String injury = text(player, "injuryStatus");
+        if (injury == null) {
+            injury = text(entry, "injuryStatus");
+        }
+        if (injury != null && (injury.isBlank() || injury.equals("ACTIVE") || injury.equals("NORMAL"))) {
+            injury = null;
+        }
+        return new LeagueRosterPlayer(
+                playerId,
+                text(player, "fullName"),
+                EspnPlayerFields.teamAbbrev(player),
+                EspnPlayerFields.jerseyNumber(player),
+                "G".equals(position),
+                position == null ? List.of() : EspnPlayerFields.eligiblePositions(player, position),
+                entry.has("lineupSlotId") ? SLOT_CODE.get(entry.path("lineupSlotId").asText()) : null,
+                injury);
     }
 
     static DraftStatus draftStatus(JsonNode detail) {
