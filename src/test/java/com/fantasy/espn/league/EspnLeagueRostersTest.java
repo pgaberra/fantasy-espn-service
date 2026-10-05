@@ -5,6 +5,7 @@ import com.fantasy.espn.credential.EspnCookies;
 import com.fantasy.espn.credential.EspnCredentialService;
 import com.fantasy.espn.exception.EspnLeagueNotFoundException;
 import com.fantasy.espn.league.dto.DraftStatus;
+import com.fantasy.espn.league.dto.LeagueRosterPlayer;
 import com.fantasy.espn.league.dto.LeagueRostersResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,6 +78,46 @@ class EspnLeagueRostersTest {
         assertThat(rosters.teams().get(0).playerIds()).containsExactly(111L, 222L);
         assertThat(rosters.teams().get(1).playerIds()).containsExactly(333L);
         server.verify();
+    }
+
+    @Test
+    void rosters_carriesEachPlayersClubPositionsSlotAndInjury() {
+        respond("""
+                {
+                  "teams": [
+                    {"id": 1, "name": "Alpha", "roster": {"entries": [
+                      {"playerId": 111, "lineupSlotId": 6, "playerPoolEntry": {"player": {
+                        "fullName": "Center Wing", "proTeamId": 6, "jersey": "97", "defaultPositionId": 1,
+                        "eligibleSlots": [0, 1, 3, 6, 7, 8], "injuryStatus": "ACTIVE"}}},
+                      {"playerId": 222, "lineupSlotId": 8, "playerPoolEntry": {"player": {
+                        "fullName": "Hurt Goalie", "proTeamId": 0, "defaultPositionId": 5,
+                        "eligibleSlots": [5, 7, 8], "injuryStatus": "OUT"}}},
+                      {"playerId": 333}
+                    ]}}
+                  ]
+                }
+                """);
+
+        List<LeagueRosterPlayer> players = service.rosters("u1", "123").teams().getFirst().players();
+
+        assertThat(players).extracting("espnId").containsExactly(111L, 222L, 333L);
+        LeagueRosterPlayer skater = players.get(0);
+        assertThat(skater.fullName()).isEqualTo("Center Wing");
+        assertThat(skater.teamAbbrev()).isEqualTo("EDM");
+        assertThat(skater.uniformNumber()).isEqualTo(97);
+        assertThat(skater.goalie()).isFalse();
+        assertThat(skater.eligiblePositions()).containsExactly("C", "LW");
+        assertThat(skater.lineupSlot()).isEqualTo("Util");
+        assertThat(skater.injuryStatus()).isNull();
+        LeagueRosterPlayer goalie = players.get(1);
+        assertThat(goalie.goalie()).isTrue();
+        assertThat(goalie.teamAbbrev()).isNull();
+        assertThat(goalie.lineupSlot()).isEqualTo("IR");
+        assertThat(goalie.injuryStatus()).isEqualTo("OUT");
+        LeagueRosterPlayer bare = players.get(2);
+        assertThat(bare.fullName()).isNull();
+        assertThat(bare.eligiblePositions()).isEmpty();
+        assertThat(bare.lineupSlot()).isNull();
     }
 
     @Test
