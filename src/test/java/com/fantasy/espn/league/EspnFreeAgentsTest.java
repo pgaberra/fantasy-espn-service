@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,8 +85,9 @@ class EspnFreeAgentsTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://espn.test");
         server = MockRestServiceServer.bindTo(builder).build();
         credentialService = mock(EspnCredentialService.class);
-        service = new EspnLeagueService(new EspnFantasyClient(builder.build(), props),
-                credentialService, props);
+        EspnFantasyClient client = new EspnFantasyClient(builder.build(), props);
+        service = new EspnLeagueService(client, credentialService,
+                new EspnScoringPeriods(client, Clock.systemUTC(), props), props);
     }
 
     @Test

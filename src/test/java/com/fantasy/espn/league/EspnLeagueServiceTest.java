@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +68,8 @@ class EspnLeagueServiceTest {
         EspnFantasyClient client =
                 new EspnFantasyClient(builder.build(), props);
         credentialService = mock(EspnCredentialService.class);
-        service = new EspnLeagueService(client, credentialService, props);
+        service = new EspnLeagueService(client, credentialService,
+                new EspnScoringPeriods(client, Clock.systemUTC(), props), props);
     }
 
     @Test

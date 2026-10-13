@@ -7,7 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.time.LocalDate;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -33,6 +36,19 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
                 .orElse("Validation failed");
+        return build(HttpStatus.BAD_REQUEST, message);
+    }
+
+    /**
+     * A query or path value that does not convert to its parameter's type, such as a date that is
+     * not YYYY-MM-DD. The caller sent something malformed, so it is a 400 like any other, not the
+     * catch-all's 500. The value itself is not echoed back.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorDto> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String message = LocalDate.class.equals(e.getRequiredType())
+                ? e.getName() + " must be a date in the form YYYY-MM-DD"
+                : e.getName() + " has a value of the wrong type";
         return build(HttpStatus.BAD_REQUEST, message);
     }
 

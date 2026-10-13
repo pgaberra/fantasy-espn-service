@@ -103,6 +103,36 @@ public class EspnFantasyClient {
     }
 
     /**
+     * The league document as it stood, or is set to stand, in one daily scoring period: ESPN keeps
+     * a lineup per period, so {@code mRoster} read this way gives each player's slot on that day.
+     */
+    public JsonNode getLeagueForPeriod(
+            int season, String leagueId, EspnCookies cookies, int scoringPeriodId, String... views) {
+        return fetch(
+                uriBuilder -> uriBuilder
+                        .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}")
+                        .queryParam("view", (Object[]) views)
+                        .queryParam("scoringPeriodId", scoringPeriodId)
+                        .build(gameKey, season, leagueId),
+                cookies,
+                null);
+    }
+
+    /**
+     * Every NHL club's games for a season, filed by the daily scoring period each is played in.
+     * Game-wide and public, so it is read without cookies.
+     */
+    public JsonNode getProSchedule(int season) {
+        return fetch(
+                uriBuilder -> uriBuilder
+                        .path("/apis/v3/games/{gameKey}/seasons/{season}")
+                        .queryParam("view", "proTeamSchedules_wl")
+                        .build(gameKey, season),
+                null,
+                null);
+    }
+
+    /**
      * One ESPN read: the user's cookies when there are any, an optional player filter, and the
      * status mapping every caller depends on — a private league or stale cookies is the caller's
      * 400, not a fault of ours, and only a failure ESPN itself reported is a 502.

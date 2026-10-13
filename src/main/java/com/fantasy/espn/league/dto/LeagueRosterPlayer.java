@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-/** A player on a team's roster today, with the slot the manager has him in. */
+/** A player on a team's roster, with the slot the manager has him in on the day read. */
 public record LeagueRosterPlayer(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "ESPN's player id")
         long espnId,
@@ -20,8 +20,8 @@ public record LeagueRosterPlayer(
                 description = "Every position he may be started at in this league; empty when ESPN sends "
                         + "no player with the entry")
         List<String> eligiblePositions,
-        @Schema(description = "The slot he sits in today (C, LW, RW, F, D, G, Util, BN, IR); absent when "
-                + "ESPN does not say", example = "BN")
+        @Schema(description = "The slot he sits in on the day read, today unless a date was asked for "
+                + "(C, LW, RW, F, D, G, Util, BN, IR); absent when ESPN does not say", example = "BN")
         String lineupSlot,
         @Schema(description = "ESPN's injury status (DAY_TO_DAY, OUT, INJURY_RESERVE, SUSPENSION, …); "
                 + "absent for a healthy player", example = "DAY_TO_DAY")

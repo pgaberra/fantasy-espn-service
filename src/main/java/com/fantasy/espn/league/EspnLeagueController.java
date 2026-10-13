@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "ESPN Leagues", description = "A user's ESPN fantasy hockey league settings and teams")
@@ -53,17 +55,23 @@ public class EspnLeagueController {
 
     @Operation(summary = "Get a league's teams and the players on each roster today",
             description = "Read for the configured season only, never the one before: a league is ranked "
-                    + "on what its teams hold now. Players are named by ESPN's own ids.")
+                    + "on what its teams hold now. Players are named by ESPN's own ids. With a date, each "
+                    + "player's lineup slot is the one he holds that day.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Rosters returned"),
-            @ApiResponse(responseCode = "400", description = "League is private (cookies missing/invalid) "
-                    + "or the league id is malformed"),
+            @ApiResponse(responseCode = "400", description = "League is private (cookies missing/invalid), "
+                    + "the league id or date is malformed, or the date is outside the season"),
             @ApiResponse(responseCode = "404", description = "No such ESPN league this season")
     })
     @GetMapping("/{leagueId}/rosters")
-    public LeagueRostersResponse rosters(@PathVariable @NotBlank @Size(max = 20) String leagueId,
-                                         @RequestParam @NotBlank @Size(max = 128) String appUserId) {
-        return leagueService.rosters(appUserId, leagueId);
+    public LeagueRostersResponse rosters(
+            @PathVariable @NotBlank @Size(max = 20) String leagueId,
+            @RequestParam @NotBlank @Size(max = 128) String appUserId,
+            @Parameter(description = "Read each player's lineup slot as set for this day (YYYY-MM-DD, the US "
+                    + "Eastern calendar day ESPN keeps its daily lineups by); for a day still to come, what the "
+                    + "manager has set for it so far. Today's lineup when absent.", example = "2026-10-14")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return leagueService.rosters(appUserId, leagueId, date);
     }
 
     @Operation(summary = "List the players the league has available",
