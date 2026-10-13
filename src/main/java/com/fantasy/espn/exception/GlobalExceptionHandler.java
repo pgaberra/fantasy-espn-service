@@ -1,9 +1,16 @@
 package com.fantasy.espn.exception;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -11,6 +18,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDate;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -52,6 +61,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, message);
     }
 
+    /**
+     * A query or path value over its constraint (a league id longer than {@code @Size} allows, a
+     * limit out of range) on a {@code @Validated} controller. Spring's method validation reports
+     * these as Bean Validation's own exception, which is no {@code ErrorResponse}, so the
+     * catch-all cannot tell it from a fault. Each parameter is named with its rule; the value
+     * itself is not echoed back.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorDto> handleConstraintViolation(ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(violation -> parameterName(violation) + " " + violation.getMessage())
+                .sorted()
+                .collect(Collectors.joining("; "));
+        return build(HttpStatus.BAD_REQUEST, message.isEmpty() ? "Validation failed" : message);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorDto> handleBadRequest(IllegalArgumentException e) {
         // Expected client outcome (e.g. malformed league id / season), not a server fault.
@@ -83,9 +108,18 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "No resource found for the requested path");
     }
 
+    /**
+     * Anything no handler above names. A refusal Spring MVC itself raises (a required parameter
+     * missing, a method the path does not serve, a body type it cannot read) carries its own 4xx,
+     * and that is the caller's mistake, not a fault: it answers with that status and its headers,
+     * so a 405 keeps its {@code Allow}, and is not logged. Taking those for faults answered every
+     * one with a 500 and sent Sentry an ERROR. Everything else is ours, and is logged in full.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDto> handleUnexpected(Exception e) {
-        // An unmatched exception must never be silently swallowed — log the full trace.
+        if (e instanceof ErrorResponse refusal && refusal.getStatusCode().is4xxClientError()) {
+            return refused(refusal.getStatusCode(), refusal.getHeaders());
+        }
         log.error("Unhandled exception", e);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
@@ -93,5 +127,26 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ErrorDto> build(HttpStatus status, String message) {
         return ResponseEntity.status(status)
                 .body(ErrorDto.of(status.value(), status.getReasonPhrase(), message));
+    }
+
+    /**
+     * Described by the status's reason phrase rather than the exception's message, which is
+     * written for a log. Always JSON: a refusal of the caller's {@code Accept} cannot be answered
+     * in a type that header asked for.
+     */
+    private static ResponseEntity<ErrorDto> refused(HttpStatusCode status, HttpHeaders headers) {
+        HttpStatus known = HttpStatus.resolve(status.value());
+        String reason = known != null ? known.getReasonPhrase() : "Client error";
+        return ResponseEntity.status(status)
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorDto.of(status.value(), reason, reason));
+    }
+
+    private static String parameterName(ConstraintViolation<?> violation) {
+        return StreamSupport.stream(violation.getPropertyPath().spliterator(), false)
+                .reduce((first, last) -> last)
+                .map(Path.Node::getName)
+                .orElse("value");
     }
 }
