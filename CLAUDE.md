@@ -80,7 +80,11 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
     **Rosters** read `mRoster` + `mTeam` + `mSettings` + `mDraftDetail` for Team Power Rankings: each
     team's players today (ESPN ids, bench and IR included) and the draft status beside them
     (`draftDetail.drafted`/`inProgress`). **Configured season only, no fallback**: a league ranked
-    on last season's rosters would read as this one's.
+    on last season's rosters would read as this one's. An optional `date` reads each player's
+    `lineupSlot` for that day instead: ESPN keeps a lineup per daily scoring period, and
+    `EspnScoringPeriods` turns the day into its period from ESPN's NHL schedule
+    (`seasons/{season}?view=proTeamSchedules_wl`, games filed by period with their start times,
+    read on US Eastern days, re-read after 6 h), never from our clock against ESPN's "today".
     **Free agents** are the players no team in the league owns, free agents and waivers together,
     read from the league-scoped player document with an `x-fantasy-filter` of
     `filterStatus: [FREEAGENT, WAIVERS]` and sorted by percent owned across ESPN, which is the
@@ -175,7 +179,8 @@ Swagger UI (when running): `http://localhost:8090/swagger-ui.html`
 - **scoringType** lives at `settings.scoringSettings.scoringType`; the BFF collapses it to
   points vs category. League size = `settings.size`.
 - ESPN's v3 API is **unofficial** and can change shape without notice — keep all shape
-  assumptions inside `EspnFantasyClient` + `EspnLeagueService`, covered by JSON fixtures.
+  assumptions inside `EspnFantasyClient` + `EspnLeagueService` (+ `EspnScoringPeriods` for the
+  schedule document), covered by JSON fixtures.
 
 ## Database & config
 

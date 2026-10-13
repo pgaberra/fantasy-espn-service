@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -38,6 +39,30 @@ class EspnFantasyClientTest {
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         client.getLeague(2025, "123", null, "mSettings");
+
+        server.verify();
+    }
+
+    @Test
+    void getLeagueForPeriod_asksForThatDailyScoringPeriod() {
+        server.expect(requestTo(containsString(
+                        "/apis/v3/games/fhl/seasons/2027/segments/0/leagues/123?view=mRoster&view=mTeam"
+                                + "&scoringPeriodId=7")))
+                .andExpect(header("Cookie", containsString("espn_s2=s2val")))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.getLeagueForPeriod(2027, "123", new EspnCookies("s2val", "{ID-1}"), 7, "mRoster", "mTeam");
+
+        server.verify();
+    }
+
+    @Test
+    void getProSchedule_readsTheSeasonsNhlScheduleWithoutCookies() {
+        server.expect(requestTo(containsString("/apis/v3/games/fhl/seasons/2027?view=proTeamSchedules_wl")))
+                .andExpect(headerDoesNotExist("Cookie"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.getProSchedule(2027);
 
         server.verify();
     }

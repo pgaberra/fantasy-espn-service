@@ -18,6 +18,7 @@ import com.fantasy.espn.league.dto.StatCategory;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,14 +85,18 @@ public class EspnLeagueService {
             Map.entry(38, "PPP"),
             Map.entry(39, "SHP"));
 
+    private static final String[] ROSTER_VIEWS = {"mRoster", "mTeam", "mSettings", "mDraftDetail"};
+
     private final EspnFantasyClient client;
     private final EspnCredentialService credentialService;
+    private final EspnScoringPeriods scoringPeriods;
     private final int configuredSeason;
 
     public EspnLeagueService(EspnFantasyClient client, EspnCredentialService credentialService,
-                             EspnProperties props) {
+                             EspnScoringPeriods scoringPeriods, EspnProperties props) {
         this.client = client;
         this.credentialService = credentialService;
+        this.scoringPeriods = scoringPeriods;
         this.configuredSeason = props.season();
     }
 
@@ -199,14 +204,20 @@ public class EspnLeagueService {
      * <p>Unlike the settings read this never falls back to the season before: a league ranked on
      * last season's rosters would read as this one's, and one that has not drafted yet is an answer
      * of its own (empty rosters) rather than a reason to look elsewhere.
+     *
+     * <p>With a {@code date} each player's slot is the one he holds that day — for a day still to
+     * come, what the manager has set for it so far. ESPN keeps a lineup per daily scoring period,
+     * and {@link EspnScoringPeriods} says which period the day is.
      */
-    public LeagueRostersResponse rosters(String appUserId, String leagueId) {
+    public LeagueRostersResponse rosters(String appUserId, String leagueId, LocalDate date) {
         String id = requireNumericLeagueId(leagueId);
+        Integer period = date == null ? null : scoringPeriods.periodOn(date);
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
         String mySwid = cookies == null ? null : normalizeSwid(cookies.swid());
 
-        JsonNode root = client.getLeague(
-                configuredSeason, id, cookies, "mRoster", "mTeam", "mSettings", "mDraftDetail");
+        JsonNode root = period == null
+                ? client.getLeague(configuredSeason, id, cookies, ROSTER_VIEWS)
+                : client.getLeagueForPeriod(configuredSeason, id, cookies, period, ROSTER_VIEWS);
         List<LeagueRosterTeam> teams = new ArrayList<>();
         for (JsonNode team : root.path("teams")) {
             List<LeagueRosterPlayer> players = rosteredPlayers(team);

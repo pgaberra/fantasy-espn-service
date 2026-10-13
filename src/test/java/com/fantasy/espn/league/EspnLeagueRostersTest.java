@@ -14,12 +14,18 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -38,16 +44,38 @@ class EspnLeagueRostersTest {
         server = MockRestServiceServer.bindTo(builder).build();
         EspnProperties props = new EspnProperties("https://espn.test", "fhl", 2027, 2026, 2025, null);
         credentialService = mock(EspnCredentialService.class);
-        service = new EspnLeagueService(new EspnFantasyClient(builder.build(), props), credentialService, props);
+        EspnFantasyClient client = new EspnFantasyClient(builder.build(), props);
+        Clock clock = Clock.fixed(Instant.parse("2026-10-13T16:00:00Z"), ZoneOffset.UTC);
+        service = new EspnLeagueService(
+                client, credentialService, new EspnScoringPeriods(client, clock, props), props);
         when(credentialService.find("u1")).thenReturn(Optional.of(new EspnCookies("s2", "{CCC-333}")));
     }
 
+    private static final String ROSTERS_URL =
+            "/seasons/2027/segments/0/leagues/123?view=mRoster&view=mTeam&view=mSettings&view=mDraftDetail";
+
     private void respond(String json) {
-        server.expect(requestTo(containsString(
-                        "/seasons/2027/segments/0/leagues/123"
-                                + "?view=mRoster&view=mTeam&view=mSettings&view=mDraftDetail")))
+        server.expect(requestTo(allOf(containsString(ROSTERS_URL), not(containsString("scoringPeriodId")))))
                 .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
     }
+
+    private void schedule() {
+        server.expect(requestTo(containsString("/seasons/2027?view=proTeamSchedules_wl")))
+                .andRespond(withSuccess(EspnScoringPeriodsTest.SCHEDULE, MediaType.APPLICATION_JSON));
+    }
+
+    private void respondForPeriod(int period, String json) {
+        server.expect(requestTo(allOf(
+                        containsString(ROSTERS_URL),
+                        containsString("&scoringPeriodId=" + period))))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+    }
+
+    private static final String BENCHED_ON_THE_DAY = """
+            {"teams": [{"id": 2, "owners": ["{CCC-333}"], "roster": {"entries": [
+              {"playerId": 111, "lineupSlotId": 7}
+            ]}}]}
+            """;
 
     @Test
     void rosters_listsEachTeamsPlayersAndWhichTeamIsTheUsers() {
@@ -67,7 +95,7 @@ class EspnLeagueRostersTest {
                 }
                 """);
 
-        LeagueRostersResponse rosters = service.rosters("u1", "123");
+        LeagueRostersResponse rosters = service.rosters("u1", "123", null);
 
         assertThat(rosters.leagueId()).isEqualTo("123");
         assertThat(rosters.season()).isEqualTo(2027);
@@ -98,7 +126,7 @@ class EspnLeagueRostersTest {
                 }
                 """);
 
-        List<LeagueRosterPlayer> players = service.rosters("u1", "123").teams().getFirst().players();
+        List<LeagueRosterPlayer> players = service.rosters("u1", "123", null).teams().getFirst().players();
 
         assertThat(players).extracting("espnId").containsExactly(111L, 222L, 333L);
         LeagueRosterPlayer skater = players.get(0);
@@ -132,7 +160,7 @@ class EspnLeagueRostersTest {
                 }
                 """);
 
-        LeagueRostersResponse rosters = service.rosters("u1", "123");
+        LeagueRostersResponse rosters = service.rosters("u1", "123", null);
 
         assertThat(rosters.status()).isEqualTo(DraftStatus.PRE_DRAFT);
         assertThat(rosters.leagueName()).isNull();
@@ -145,14 +173,47 @@ class EspnLeagueRostersTest {
         server.expect(requestTo(containsString("/seasons/2027/")))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        assertThatThrownBy(() -> service.rosters("u1", "123"))
+        assertThatThrownBy(() -> service.rosters("u1", "123", null))
                 .isInstanceOf(EspnLeagueNotFoundException.class);
         server.verify();
     }
 
     @Test
     void rosters_rejectsANonNumericLeagueId() {
-        assertThatThrownBy(() -> service.rosters("u1", "12a"))
+        assertThatThrownBy(() -> service.rosters("u1", "12a", null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rosters_forTodayReadsTodaysScoringPeriod() {
+        schedule();
+        respondForPeriod(5, BENCHED_ON_THE_DAY);
+
+        LeagueRostersResponse rosters = service.rosters("u1", "123", LocalDate.of(2026, 10, 13));
+
+        assertThat(rosters.teams().getFirst().players().getFirst().lineupSlot()).isEqualTo("BN");
+        assertThat(rosters.teams().getFirst().mine()).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void rosters_forADayToComeReadsThatDaysScoringPeriod() {
+        schedule();
+        respondForPeriod(6, BENCHED_ON_THE_DAY);
+
+        LeagueRostersResponse rosters = service.rosters("u1", "123", LocalDate.of(2026, 10, 14));
+
+        assertThat(rosters.teams().getFirst().players()).extracting("lineupSlot").containsExactly("BN");
+        server.verify();
+    }
+
+    @Test
+    void rosters_forADayOutsideTheSeasonIsRefusedBeforeTheLeagueIsRead() {
+        schedule();
+
+        assertThatThrownBy(() -> service.rosters("u1", "123", LocalDate.of(2027, 6, 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outside the 2026-27 season");
+        server.verify();
     }
 }
