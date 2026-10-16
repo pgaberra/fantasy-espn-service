@@ -141,14 +141,15 @@ public class EspnLeagueService {
      *
      * <p>ESPN answers this only for the league-scoped player document, so it needs the user's
      * cookies like any private read: without them ESPN refuses and the caller gets the same 400 a
-     * private league gives. The ids are ESPN's own, as everywhere else here.
+     * private league gives. The ids are ESPN's own, as everywhere else here. {@code waiversOnly}
+     * narrows them to the players on waivers.
      */
     public List<AvailablePlayer> freeAgents(
-            String appUserId, Integer season, String leagueId, String position, int limit) {
+            String appUserId, Integer season, String leagueId, String position, boolean waiversOnly, int limit) {
         String id = requireNumericLeagueId(leagueId);
         EspnCookies cookies = credentialService.find(appUserId).orElse(null);
 
-        JsonNode root = fetchAvailable(season, id, cookies, position, limit);
+        JsonNode root = fetchAvailable(season, id, cookies, position, waiversOnly, limit);
         List<AvailablePlayer> available = new ArrayList<>();
         // ESPN has served this document both as a bare array and wrapped in `players`.
         JsonNode entries = root.isArray() ? root : root.path("players");
@@ -162,15 +163,16 @@ public class EspnLeagueService {
     }
 
     private JsonNode fetchAvailable(
-            Integer requestedSeason, String id, EspnCookies cookies, String position, int limit) {
+            Integer requestedSeason, String id, EspnCookies cookies, String position, boolean waiversOnly,
+            int limit) {
         if (requestedSeason != null) {
             requireValidSeason(requestedSeason);
-            return client.getAvailablePlayers(requestedSeason, id, cookies, position, limit);
+            return client.getAvailablePlayers(requestedSeason, id, cookies, position, waiversOnly, limit);
         }
         try {
-            return client.getAvailablePlayers(configuredSeason, id, cookies, position, limit);
+            return client.getAvailablePlayers(configuredSeason, id, cookies, position, waiversOnly, limit);
         } catch (EspnLeagueNotFoundException notFoundForCurrentSeason) {
-            return client.getAvailablePlayers(configuredSeason - 1, id, cookies, position, limit);
+            return client.getAvailablePlayers(configuredSeason - 1, id, cookies, position, waiversOnly, limit);
         }
     }
 

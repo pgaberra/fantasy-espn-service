@@ -46,8 +46,11 @@ public class EspnFantasyClient {
      */
     private static final String PLAYER_FILTER_HEADER = "x-fantasy-filter";
     private static final String AVAILABLE_FILTER = """
-            {"players":{"filterStatus":{"value":["FREEAGENT","WAIVERS"]},%s"limit":%d,\
+            {"players":{"filterStatus":{"value":[%s]},%s"limit":%d,\
             "sortPercOwned":{"sortAsc":false,"sortPriority":1}}}""";
+
+    private static final String FREE_AGENTS_AND_WAIVERS = "\"FREEAGENT\",\"WAIVERS\"";
+    private static final String WAIVERS_ONLY = "\"WAIVERS\"";
 
     /** The positions a league's available players can be narrowed to. */
     public static final String POSITION_PATTERN = "^(C|LW|RW|D|G)$";
@@ -64,16 +67,21 @@ public class EspnFantasyClient {
      * ESPN first, which is the closest thing its player document has to "best available".
      * A {@code position} narrows them to the players eligible there, so a caller can read a
      * position's whole wire instead of the few that make a mixed top list.
+     *
+     * <p>{@code waiversOnly} asks for the players on waivers alone. That list is short, so a
+     * caller can read all of it and know the waiver status of every available player, not only of
+     * the ones that make a capped list.
      */
     public JsonNode getAvailablePlayers(
-            int season, String leagueId, EspnCookies cookies, String position, int limit) {
+            int season, String leagueId, EspnCookies cookies, String position, boolean waiversOnly, int limit) {
         return fetch(
                 uriBuilder -> uriBuilder
                         .path("/apis/v3/games/{gameKey}/seasons/{season}/segments/0/leagues/{leagueId}/players")
                         .queryParam("view", "kona_player_info")
                         .build(gameKey, season, leagueId),
                 cookies,
-                AVAILABLE_FILTER.formatted(slotFilter(position), limit));
+                AVAILABLE_FILTER.formatted(
+                        waiversOnly ? WAIVERS_ONLY : FREE_AGENTS_AND_WAIVERS, slotFilter(position), limit));
     }
 
     private static String slotFilter(String position) {
