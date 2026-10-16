@@ -93,7 +93,10 @@ public class EspnLeagueController {
             @RequestParam(defaultValue = "150") @Min(1) @Max(MAX_AVAILABLE) int limit,
             @Parameter(description = "Only the players eligible at this position; all positions when absent")
             @RequestParam(required = false) @Pattern(regexp = EspnFantasyClient.POSITION_PATTERN)
-            String position) {
-        return leagueService.freeAgents(appUserId, season, leagueId, position, limit);
+            String position,
+            @Parameter(description = "Only the players on waivers; free agents and waivers together when "
+                    + "absent or false")
+            @RequestParam(defaultValue = "false") boolean waiversOnly) {
+        return leagueService.freeAgents(appUserId, season, leagueId, position, waiversOnly, limit);
     }
 }
